@@ -1,0 +1,505 @@
+/* REGISTRASI SERVICE WORKER UNTUK PWA */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('Service Worker terdaftar:', reg.scope))
+            .catch(err => console.error('Pendaftaran Service Worker gagal:', err));
+    });
+}
+
+/* CONFIG SUPABASE */
+const SUPABASE_URL = "https://mdcegfhpkvrikxvbwxqu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_ReqDYL_GZugxAXb5ylavNw_l4p4MX4O";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let transactions = [];
+let heartbeatTimer = null;
+
+/* LOGIKA FITUR CHECKLIST BULANAN (RP 2.000 / BULAN) */
+const NOMINAL_KAS_PER_BULAN = 2000;
+let dataSiswa = JSON.parse(localStorage.getItem('dataKasSiswaBulanan')) || [
+    { nama: "Ahmad", bulan: [true, true, false, false, false, false, false, false, false, false, false, false] },
+    { nama: "Budi", bulan: [true, false, false, false, false, false, false, false, false, false, false, false] }
+];
+
+function renderTabelSiswa() {
+    const tbody = document.getElementById('bodyTabelSiswa');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (dataSiswa.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa 🧑‍🎓</td></tr>`;
+        return;
+    }
+
+    dataSiswa.forEach((siswa, indexSiswa) => {
+        const tr = document.createElement('tr');
+        const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
+        const totalBayar = jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
+
+        let htmlCheckbox = '';
+        siswa.bulan.forEach((lunas, indexBulan) => {
+            htmlCheckbox += `
+                <td style="text-align: center;">
+                    <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswa}, ${indexBulan})">
+                </td>
+            `;
+        });
+
+        tr.innerHTML = `
+            <td><b>${escapeHTML(siswa.nama)}</b></td>
+            ${htmlCheckbox}
+            <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
+            <td style="text-align: center;">
+                <button class="delete-btn" onclick="hapusSiswa(${indexSiswa})">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    localStorage.setItem('dataKasSiswaBulanan', JSON.stringify(dataSiswa));
+}
+
+function toggleBayar(indexSiswa, indexBulan) {
+    dataSiswa[indexSiswa].bulan[indexBulan] = !dataSiswa[indexSiswa].bulan[indexBulan];
+    renderTabelSiswa();
+}
+
+function tambahSiswa() {
+    const input = document.getElementById('inputNamaSiswa');
+    const nama = input.value.trim();
+    if (nama !== '') {
+        dataSiswa.push({
+            nama: nama,
+            bulan: new Array(12).fill(false)
+        });
+        input.value = '';
+        renderTabelSiswa();
+        showToast("✅ Siswa berhasil ditambahkan!");
+    } else {
+        showToast("⚠️ Masukkan nama siswa terlebih dahulu!");
+    }
+}
+
+function hapusSiswa(index) {
+    if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
+        dataSiswa.splice(index, 1);
+        renderTabelSiswa();
+        showToast("🗑️ Siswa berhasil dihapus");
+    }
+}
+
+/* FUNGSI WAKTU REAL TIME */
+function updateRealTimeClock() {
+    const now = new Date();
+    
+    const optionsDate = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    const dateFormatted = now.toLocaleDateString('id-ID', optionsDate);
+    const timeFormatted = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    const loginClock = document.getElementById("loginClock");
+    if (loginClock) {
+        loginClock.innerHTML = `<span>📅 ${dateFormatted}</span><span class="clock-divider">|</span><span>⏰ <b>${timeFormatted} WIB</b></span>`;
+    }
+
+    const dashClock = document.getElementById("dashClock");
+    if (dashClock) {
+        dashClock.innerHTML = `⏰ ${dateFormatted} • <b>${timeFormatted} WIB</b>`;
+    }
+}
+
+setInterval(updateRealTimeClock, 1000);
+updateRealTimeClock();
+
+/* PROTEKSI RATE LIMITING */
+const MAX_LOGIN_ATTEMPTS = 3;
+const LOCKOUT_TIME_MS = 30 * 1000;
+
+function getFailedAttempts() {
+    return parseInt(localStorage.getItem("failedAttempts") || "0");
+}
+
+function getLockoutUntil() {
+    return parseInt(localStorage.getItem("lockoutUntil") || "0");
+}
+
+function isLockedOut() {
+    const lockoutUntil = getLockoutUntil();
+    const now = Date.now();
+
+    if (lockoutUntil > now) {
+        const remainingSeconds = Math.ceil((lockoutUntil - now) / 1000);
+        const errorElement = document.getElementById("loginError");
+        const loginBtn = document.getElementById("loginSubmitBtn");
+
+        errorElement.innerHTML = `⏳ Terlalu banyak percobaan gagal.<br>Silakan tunggu <b>${remainingSeconds}</b> detik lagi.`;
+        errorElement.style.display = "block";
+        loginBtn.disabled = true;
+        return true;
+    } else {
+        if (lockoutUntil !== 0) {
+            localStorage.removeItem("lockoutUntil");
+            localStorage.setItem("failedAttempts", "0");
+            document.getElementById("loginSubmitBtn").disabled = false;
+            document.getElementById("loginError").style.display = "none";
+        }
+        return false;
+    }
+}
+
+setInterval(() => {
+    if (document.getElementById("loginPage").style.display !== "none") {
+        isLockedOut();
+    }
+}, 1000);
+
+/* SINGLE SESSION LOCK */
+async function checkActiveSessionLock(currentEmail) {
+    try {
+        const { data, error } = await supabaseClient
+            .from("session_lock")
+            .select("*")
+            .eq("id", 1)
+            .maybeSingle();
+
+        if (error || !data) return { locked: false };
+
+        const lastPing = new Date(data.last_ping).getTime();
+        const now = Date.now();
+        const secondsDiff = (now - lastPing) / 1000;
+
+        if (secondsDiff < 30 && data.user_email && data.user_email !== currentEmail) {
+            return { locked: true, activeUser: data.user_email };
+        }
+
+        return { locked: false };
+    } catch {
+        return { locked: false };
+    }
+}
+
+async function sendHeartbeat(email) {
+    try {
+        await supabaseClient.from("session_lock").upsert({
+            id: 1,
+            user_email: email,
+            last_ping: new Date().toISOString()
+        });
+    } catch (e) {
+        console.error("Gagal mengirim heartbeat:", e);
+    }
+}
+
+function startHeartbeat(email) {
+    stopHeartbeat();
+    sendHeartbeat(email);
+    heartbeatTimer = setInterval(() => {
+        sendHeartbeat(email);
+    }, 10000);
+}
+
+function stopHeartbeat() {
+    if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+    }
+}
+
+/* LOGIN */
+window.login = async function () {
+    if (isLockedOut()) return;
+
+    const emailInput = document.getElementById("username").value.trim();
+    const passwordInput = document.getElementById("password").value;
+    const errorElement = document.getElementById("loginError");
+
+    if (!emailInput || !passwordInput) {
+        errorElement.textContent = "⚠️ Mohon isi email dan password!";
+        errorElement.style.display = "block";
+        return;
+    }
+
+    const lockStatus = await checkActiveSessionLock(emailInput);
+    if (lockStatus.locked) {
+        errorElement.innerHTML = `🚫 Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di sistem.<br>Silakan tunggu pengguna tersebut logout!`;
+        errorElement.style.display = "block";
+        return;
+    }
+
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email: emailInput,
+        password: passwordInput
+    });
+
+    if (error) {
+        let attempts = getFailedAttempts() + 1;
+        localStorage.setItem("failedAttempts", attempts);
+
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            const lockoutUntil = Date.now() + LOCKOUT_TIME_MS;
+            localStorage.setItem("lockoutUntil", lockoutUntil);
+            isLockedOut();
+        } else {
+            const remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            errorElement.textContent = `⚠️ Email atau password salah! (Sisa percobaan: ${remaining})`;
+            errorElement.style.display = "block";
+        }
+    } else {
+        localStorage.removeItem("failedAttempts");
+        localStorage.removeItem("lockoutUntil");
+        errorElement.style.display = "none";
+        document.getElementById("password").value = "";
+
+        try {
+            await supabaseClient.from("log_login").insert([{ email: data.user.email }]);
+        } catch (err) {}
+
+        startHeartbeat(data.user.email);
+        await checkLogin();
+    }
+};
+
+/* LOGOUT */
+window.logout = async function () {
+    stopHeartbeat();
+    try {
+        await supabaseClient.from("session_lock").delete().eq("id", 1);
+    } catch(e) {}
+
+    await supabaseClient.auth.signOut();
+    location.reload();
+};
+
+/* CHECK SESSION */
+async function checkLogin() {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+
+    if (session) {
+        const userEmail = session.user.email;
+        
+        const lockStatus = await checkActiveSessionLock(userEmail);
+        if (lockStatus.locked) {
+            await supabaseClient.auth.signOut();
+            document.getElementById("loginPage").style.display = "flex";
+            document.getElementById("dashboard").style.display = "none";
+            const errorElement = document.getElementById("loginError");
+            errorElement.innerHTML = `🚫 Sesi dialihkan. Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di perangkat lain.`;
+            errorElement.style.display = "block";
+            return;
+        }
+
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
+
+        startHeartbeat(userEmail);
+        renderTabelSiswa();
+        loadTransactions();
+    } else {
+        stopHeartbeat();
+        document.getElementById("loginPage").style.display = "flex";
+        document.getElementById("dashboard").style.display = "none";
+        isLockedOut();
+    }
+}
+
+document.getElementById("password").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") window.login();
+});
+
+/* UTILS */
+function rupiah(number) {
+    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(number);
+}
+
+function getToday() {
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+document.getElementById("tanggal").value = getToday();
+
+function showToast(message) {
+    const toast = document.getElementById("toast");
+    toast.textContent = message;
+    toast.style.display = "block";
+    setTimeout(() => { toast.style.display = "none"; }, 2500);
+}
+
+/* DATABASE OPERATIONAL */
+async function checkConnection() {
+    const status = document.getElementById("connectionStatus");
+    try {
+        const { error } = await supabaseClient.from("kas_sekolah").select("id").limit(1);
+        status.innerHTML = error ? "🔴 Database tidak terhubung" : "🟢 Database terhubung aktif";
+    } catch {
+        status.innerHTML = "🔴 Database tidak terhubung";
+    }
+}
+
+async function loadTransactions() {
+    await checkConnection();
+    try {
+        const { data, error } = await supabaseClient
+            .from("kas_sekolah")
+            .select("*")
+            .order("tanggal", { ascending: false });
+
+        if (error) {
+            showToast("❌ Gagal mengambil data transaksi");
+            return;
+        }
+
+        transactions = data || [];
+        updateSummary();
+        renderTable();
+    } catch {
+        showToast("❌ Terjadi kesalahan jaringan");
+    }
+}
+
+document.getElementById("transactionForm").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const transaksi = {
+        tanggal: document.getElementById("tanggal").value,
+        jenis: document.getElementById("jenis").value,
+        jumlah: Number(document.getElementById("jumlah").value),
+        kategori: document.getElementById("kategori").value.trim(),
+        pihak: document.getElementById("pihak").value.trim(),
+        metode: document.getElementById("metode").value,
+        keterangan: document.getElementById("keterangan").value.trim()
+    };
+
+    if (!transaksi.jumlah || transaksi.jumlah <= 0) {
+        showToast("❌ Nominal harus lebih dari 0");
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient.from("kas_sekolah").insert([transaksi]);
+        if (error) {
+            showToast("❌ Gagal menyimpan data");
+            return;
+        }
+        showToast("✅ Transaksi berhasil dicatat!");
+        this.reset();
+        document.getElementById("tanggal").value = getToday();
+        await loadTransactions();
+    } catch {
+        showToast("❌ Terjadi kesalahan sistem");
+    }
+});
+
+window.deleteTransaction = async function (id) {
+    if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) return;
+
+    try {
+        const { error } = await supabaseClient.from("kas_sekolah").delete().eq("id", id);
+        if (error) {
+            showToast("❌ Gagal menghapus transaksi");
+            return;
+        }
+        showToast("🗑 Transaksi berhasil dihapus");
+        await loadTransactions();
+    } catch {
+        showToast("❌ Terjadi kesalahan saat menghapus");
+    }
+};
+
+function updateSummary() {
+    let masuk = 0, keluar = 0;
+    transactions.forEach(item => {
+        if (item.jenis === "MASUK") masuk += Number(item.jumlah);
+        else if (item.jenis === "KELUAR") keluar += Number(item.jumlah);
+    });
+
+    document.getElementById("totalMasuk").textContent = rupiah(masuk);
+    document.getElementById("totalKeluar").textContent = rupiah(keluar);
+    document.getElementById("saldo").textContent = rupiah(masuk - keluar);
+}
+
+function getFilteredData() {
+    const search = document.getElementById("search").value.toLowerCase().trim();
+    const tanggal = document.getElementById("filterTanggal").value;
+    const jenis = document.getElementById("filterJenis").value;
+    const kategori = document.getElementById("filterKategori").value.toLowerCase().trim();
+
+    return transactions.filter(item => {
+        const text = `${item.kategori || ''} ${item.pihak || ''} ${item.keterangan || ''}`.toLowerCase();
+        return text.includes(search) &&
+            (!tanggal || item.tanggal === tanggal) &&
+            (!jenis || item.jenis === jenis) &&
+            (!kategori || (item.kategori || '').toLowerCase().includes(kategori));
+    });
+}
+
+function renderTable() {
+    const tbody = document.getElementById("transactionTable");
+    const data = getFilteredData();
+    tbody.innerHTML = "";
+
+    if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#888;padding:30px;">Belum ada transaksi kas 💸</td></tr>`;
+        return;
+    }
+
+    data.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${formatDate(item.tanggal)}</td>
+            <td class="${item.jenis === "MASUK" ? "masuk" : "keluar"}">${item.jenis === "MASUK" ? "💸 MASUK" : "📤 KELUAR"}</td>
+            <td>${rupiah(item.jumlah)}</td>
+            <td>${escapeHTML(item.kategori)}</td>
+            <td>${escapeHTML(item.pihak)}</td>
+            <td>${escapeHTML(item.metode)}</td>
+            <td>${escapeHTML(item.keterangan || "-")}</td>
+            <td>
+                <button class="delete-btn" onclick="deleteTransaction('${item.id}')">Hapus</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function formatDate(date) {
+    if (!date) return "-";
+    return new Date(date + "T00:00:00").toLocaleDateString("id-ID", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function escapeHTML(text) {
+    return String(text)
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+
+["search", "filterTanggal", "filterKategori"].forEach(id => {
+    document.getElementById(id).addEventListener("input", renderTable);
+});
+document.getElementById("filterJenis").addEventListener("change", renderTable);
+
+window.exportCSV = function () {
+    const data = getFilteredData();
+    if (data.length === 0) {
+        showToast("Tidak ada data untuk diekspor");
+        return;
+    }
+
+    let csv = "Tanggal,Jenis,Jumlah,Kategori,Pihak,Metode,Keterangan\n";
+    data.forEach(item => {
+        const clean = str => `"${String(str || '').replaceAll('"', '""')}"`;
+        csv += [item.tanggal, item.jenis, item.jumlah, clean(item.kategori), clean(item.pihak), clean(item.metode), clean(item.keterangan)].join(",") + "\n";
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `laporan-kas-sekolah-${getToday()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+};
+
+/* RUN ON STARTUP */
+checkLogin();
