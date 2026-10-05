@@ -36,37 +36,39 @@ function renderTabelSiswa() {
 
     if (filteredData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa untuk kelas ini 🧑‍🎓</td></tr>`;
-        return;
-    }
+    } else {
+        filteredData.forEach((siswa) => {
+            const indexSiswaOriginal = dataSiswa.indexOf(siswa);
+            const tr = document.createElement('tr');
+            const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
+            const totalBayar = jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
 
-    filteredData.forEach((siswa) => {
-        const indexSiswaOriginal = dataSiswa.indexOf(siswa);
-        const tr = document.createElement('tr');
-        const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
-        const totalBayar = jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
+            let htmlCheckbox = '';
+            siswa.bulan.forEach((lunas, indexBulan) => {
+                htmlCheckbox += `
+                    <td style="text-align: center;">
+                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
+                    </td>
+                `;
+            });
 
-        let htmlCheckbox = '';
-        siswa.bulan.forEach((lunas, indexBulan) => {
-            htmlCheckbox += `
+            tr.innerHTML = `
+                <td><b>${escapeHTML(siswa.nama)}</b></td>
+                <td><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap;">Kelas ${escapeHTML(siswa.kelas || '-')}</span></td>
+                ${htmlCheckbox}
+                <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
                 <td style="text-align: center;">
-                    <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
+                    <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
                 </td>
             `;
+            tbody.appendChild(tr);
         });
-
-        tr.innerHTML = `
-            <td><b>${escapeHTML(siswa.nama)}</b></td>
-            <td><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap;">Kelas ${escapeHTML(siswa.kelas || '-')}</span></td>
-            ${htmlCheckbox}
-            <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
-            <td style="text-align: center;">
-                <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+    }
 
     localStorage.setItem('dataKasSiswaBulanan', JSON.stringify(dataSiswa));
+    
+    // OTOMATIS HITUNG ULANG RINGKASAN SISA SALDO & UANG MASUK
+    updateSummary();
 }
 
 function toggleBayar(indexSiswa, indexBulan) {
@@ -227,7 +229,7 @@ window.login = async function () {
     const errorElement = document.getElementById("loginError");
 
     if (!emailInput || !passwordInput) {
-        errorElement.textContent = "⚠️️ Mohon isi email dan password!";
+        errorElement.textContent = "⚠️ Mohon isi email dan password!";
         errorElement.style.display = "block";
         return;
     }
@@ -419,13 +421,27 @@ window.deleteTransaction = async function (id) {
     }
 };
 
+/* FUNGSI UPDATE RINGKASAN TOTAL DANA MASUK & SALDO */
 function updateSummary() {
     let masuk = 0, keluar = 0;
+    
+    // 1. Hitung transaksi manual (pemasukan/pengeluaran) dari Supabase
     transactions.forEach(item => {
         if (item.jenis === "MASUK") masuk += Number(item.jumlah);
         else if (item.jenis === "KELUAR") keluar += Number(item.jumlah);
     });
 
+    // 2. Hitung otomatis total uang dari checklist siswa (Rp2.000 per bulan yang dicentang)
+    let totalKasChecklist = 0;
+    dataSiswa.forEach(siswa => {
+        const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
+        totalKasChecklist += jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
+    });
+
+    // Gabungkan total kas checklist ke dalam Total Dana Masuk
+    masuk += totalKasChecklist;
+
+    // Tampilkan hasil di kartu ringkasan
     document.getElementById("totalMasuk").textContent = rupiah(masuk);
     document.getElementById("totalKeluar").textContent = rupiah(keluar);
     document.getElementById("saldo").textContent = rupiah(masuk - keluar);
