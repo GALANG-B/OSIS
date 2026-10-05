@@ -143,7 +143,7 @@ body {
     color: rgba(255,255,255,0.2);
 }
 
-/* Logo Box Dengan Gambar Logo Anda */
+/* Logo Box Dengan Gambar Logo */
 .login-logo-container {
     position: relative;
     width: 105px;
@@ -801,6 +801,36 @@ footer {
         🔄 Menghubungkan ke database...
     </div>
 
+    <!-- SEKSI CHECKLIST KAS SISWA -->
+    <div class="section">
+        <h2>☑️ Checklist Pembayaran Kas Siswa</h2>
+        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Pencatatan kas mingguan siswa per bulan (Rp2.000/minggu)</p>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+            <input type="text" id="inputNamaSiswa" placeholder="Masukkan nama siswa baru..." style="flex: 1; min-width: 220px;">
+            <button type="button" class="save-btn" onclick="tambahSiswa()" style="width: auto; padding: 12px 20px;">+ Tambah Siswa</button>
+        </div>
+
+        <div class="table-wrap">
+            <table style="min-width: 600px;">
+                <thead>
+                    <tr>
+                        <th>Nama Siswa</th>
+                        <th style="text-align: center;">M1</th>
+                        <th style="text-align: center;">M2</th>
+                        <th style="text-align: center;">M3</th>
+                        <th style="text-align: center;">M4</th>
+                        <th>Total Terbayar</th>
+                        <th style="text-align: center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyTabelSiswa">
+                    <!-- Data siswa dimuat melalui JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <div class="section">
         <h2>📝 Tambah Transaksi Kas</h2>
 
@@ -908,7 +938,7 @@ footer {
 <div class="toast" id="toast"></div>
 
 <!-- =====================================================
-     JAVASCRIPT INTEGRATION (LOGIKA UTUH 100%)
+     JAVASCRIPT INTEGRATION (LOGIKA UTUH)
 ===================================================== -->
 <script>
 /* REGISTRASI SERVICE WORKER UNTUK PWA */
@@ -927,6 +957,80 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let transactions = [];
 let heartbeatTimer = null;
+
+/* LOGIKA FITUR CHECKLIST SISWA */
+const NOMINAL_KAS_PER_MINGGU = 2000;
+let dataSiswa = JSON.parse(localStorage.getItem('dataKasSiswa')) || [
+    { nama: "Ahmad", minggu: [true, true, false, false] },
+    { nama: "Budi", minggu: [true, false, false, false] }
+];
+
+function renderTabelSiswa() {
+    const tbody = document.getElementById('bodyTabelSiswa');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    if (dataSiswa.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa 🧑‍🎓</td></tr>`;
+        return;
+    }
+
+    dataSiswa.forEach((siswa, indexSiswa) => {
+        const tr = document.createElement('tr');
+        const jumlahMingguLunas = siswa.minggu.filter(m => m === true).length;
+        const totalBayar = jumlahMingguLunas * NOMINAL_KAS_PER_MINGGU;
+
+        let htmlCheckbox = '';
+        siswa.minggu.forEach((lunas, indexMinggu) => {
+            htmlCheckbox += `
+                <td style="text-align: center;">
+                    <input type="checkbox" style="width: 20px; height: 20px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswa}, ${indexMinggu})">
+                </td>
+            `;
+        });
+
+        tr.innerHTML = `
+            <td><b>${escapeHTML(siswa.nama)}</b></td>
+            ${htmlCheckbox}
+            <td class="masuk">${rupiah(totalBayar)}</td>
+            <td style="text-align: center;">
+                <button class="delete-btn" onclick="hapusSiswa(${indexSiswa})">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    localStorage.setItem('dataKasSiswa', JSON.stringify(dataSiswa));
+}
+
+function toggleBayar(indexSiswa, indexMinggu) {
+    dataSiswa[indexSiswa].minggu[indexMinggu] = !dataSiswa[indexSiswa].minggu[indexMinggu];
+    renderTabelSiswa();
+}
+
+function tambahSiswa() {
+    const input = document.getElementById('inputNamaSiswa');
+    const nama = input.value.trim();
+    if (nama !== '') {
+        dataSiswa.push({
+            nama: nama,
+            minggu: [false, false, false, false]
+        });
+        input.value = '';
+        renderTabelSiswa();
+        showToast("✅ Siswa berhasil ditambahkan!");
+    } else {
+        showToast("⚠️ Masukkan nama siswa terlebih dahulu!");
+    }
+}
+
+function hapusSiswa(index) {
+    if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
+        dataSiswa.splice(index, 1);
+        renderTabelSiswa();
+        showToast("🗑️ Siswa berhasil dihapus");
+    }
+}
 
 /* FUNGSI WAKTU REAL TIME */
 function updateRealTimeClock() {
@@ -1132,6 +1236,7 @@ async function checkLogin() {
         document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
 
         startHeartbeat(userEmail);
+        renderTabelSiswa();
         loadTransactions();
     } else {
         stopHeartbeat();
