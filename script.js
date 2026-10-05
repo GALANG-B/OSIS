@@ -28,14 +28,16 @@ function renderTabelSiswa() {
     tbody.innerHTML = '';
 
     const filterKelas = document.getElementById('filterKelasSiswa') ? document.getElementById('filterKelasSiswa').value : '';
+    const searchQuery = document.getElementById('searchSiswa') ? document.getElementById('searchSiswa').value.toLowerCase().trim() : '';
 
     const filteredData = dataSiswa.filter(siswa => {
-        if (!filterKelas) return true;
-        return (siswa.kelas || '') === filterKelas;
+        const matchKelas = !filterKelas || (siswa.kelas || '') === filterKelas;
+        const matchName = !searchQuery || siswa.nama.toLowerCase().includes(searchQuery);
+        return matchKelas && matchName;
     });
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa untuk kelas ini 🧑‍🎓</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa yang cocok 🧑‍🎓</td></tr>`;
     } else {
         filteredData.forEach((siswa) => {
             const indexSiswaOriginal = dataSiswa.indexOf(siswa);
@@ -57,7 +59,8 @@ function renderTabelSiswa() {
                 <td><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap;">Kelas ${escapeHTML(siswa.kelas || '-')}</span></td>
                 ${htmlCheckbox}
                 <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
-                <td style="text-align: center;">
+                <td style="text-align: center; white-space: nowrap;">
+                    <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan(${indexSiswaOriginal})" title="Lunas 1 Tahun">Lunas 1Th</button>
                     <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
                 </td>
             `;
@@ -75,6 +78,15 @@ function renderTabelSiswa() {
 function toggleBayar(indexSiswa, indexBulan) {
     dataSiswa[indexSiswa].bulan[indexBulan] = !dataSiswa[indexSiswa].bulan[indexBulan];
     renderTabelSiswa();
+}
+
+/* FITUR BARU: Lunas 1 Tahun Sekaligus */
+function lunasSemuaBulan(indexSiswa) {
+    const isAllChecked = dataSiswa[indexSiswa].bulan.every(b => b === true);
+    // Jika sudah lunas semua, reset jadi false semua. Jika belum, centang semua.
+    dataSiswa[indexSiswa].bulan = new Array(12).fill(!isAllChecked);
+    renderTabelSiswa();
+    showToast(`✅ Status pembayaran ${dataSiswa[indexSiswa].nama} diperbarui!`);
 }
 
 function tambahSiswa() {
