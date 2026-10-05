@@ -15,18 +15,40 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let transactions = [];
 let heartbeatTimer = null;
 
-/* LOGIKA FITUR CHECKLIST BULANAN (RP 2.000 / BULAN) KLASIFIKASI KELAS 7-12 */
+/* LOGIKA FITUR CHECKLIST BULANAN BERDASARKAN TAHUN TERPILIH */
 const NOMINAL_KAS_PER_BULAN = 2000;
-let dataSiswa = JSON.parse(localStorage.getItem('dataKasSiswaBulanan')) || [
-    { nama: "Ahmad", kelas: "7", bulan: [true, true, false, false, false, false, false, false, false, false, false, false] },
-    { nama: "Budi", kelas: "8", bulan: [true, false, false, false, false, false, false, false, false, false, false, false] }
-];
+
+function getSelectedYear() {
+    const el = document.getElementById('filterTahunRecap');
+    return el ? el.value : '2026';
+}
+
+function getDataSiswa() {
+    const year = getSelectedYear();
+    const storageKey = 'dataKasSiswaBulanan_' + year;
+    let data = JSON.parse(localStorage.getItem(storageKey));
+    if (!data) {
+        data = [
+            { nama: "Ahmad", kelas: "7", bulan: new Array(12).fill(false) },
+            { nama: "Budi", kelas: "8", bulan: new Array(12).fill(false) }
+        ];
+        localStorage.setItem(storageKey, JSON.stringify(data));
+    }
+    return data;
+}
+
+function saveCurrentDataSiswa(data) {
+    const year = getSelectedYear();
+    const storageKey = 'dataKasSiswaBulanan_' + year;
+    localStorage.setItem(storageKey, JSON.stringify(data));
+}
 
 function renderTabelSiswa() {
     const tbody = document.getElementById('bodyTabelSiswa');
     if (!tbody) return;
     tbody.innerHTML = '';
 
+    let dataSiswa = getDataSiswa();
     const filterKelas = document.getElementById('filterKelasSiswa') ? document.getElementById('filterKelasSiswa').value : '';
     const searchQuery = document.getElementById('searchSiswa') ? document.getElementById('searchSiswa').value.toLowerCase().trim() : '';
 
@@ -37,7 +59,7 @@ function renderTabelSiswa() {
     });
 
     if (filteredData.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa yang cocok 🧑‍🎓</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa untuk tahun ini 🧑‍🎓</td></tr>`;
     } else {
         filteredData.forEach((siswa) => {
             const indexSiswaOriginal = dataSiswa.indexOf(siswa);
@@ -68,24 +90,25 @@ function renderTabelSiswa() {
         });
     }
 
-    localStorage.setItem('dataKasSiswaBulanan', JSON.stringify(dataSiswa));
-    
-    // OTOMATIS HITUNG ULANG RINGKASAN SALDO & REKAP TAHUNAN
+    saveCurrentDataSiswa(dataSiswa);
     updateSummary();
     renderRecapTahunan();
 }
 
 function toggleBayar(indexSiswa, indexBulan) {
+    let dataSiswa = getDataSiswa();
     dataSiswa[indexSiswa].bulan[indexBulan] = !dataSiswa[indexSiswa].bulan[indexBulan];
+    saveCurrentDataSiswa(dataSiswa);
     renderTabelSiswa();
 }
 
-/* FITUR: Lunas 1 Tahun Sekaligus */
 function lunasSemuaBulan(indexSiswa) {
+    let dataSiswa = getDataSiswa();
     const isAllChecked = dataSiswa[indexSiswa].bulan.every(b => b === true);
     dataSiswa[indexSiswa].bulan = new Array(12).fill(!isAllChecked);
+    saveCurrentDataSiswa(dataSiswa);
     renderTabelSiswa();
-    showToast(`✅ Status pembayaran ${dataSiswa[indexSiswa].nama} diperbarui!`);
+    showToast(`✅ Status pembayaran diperbarui!`);
 }
 
 function tambahSiswa() {
@@ -95,43 +118,47 @@ function tambahSiswa() {
     const kelas = selectKelas ? selectKelas.value : '7';
 
     if (nama !== '') {
+        let dataSiswa = getDataSiswa();
         dataSiswa.push({
             nama: nama,
             kelas: kelas,
             bulan: new Array(12).fill(false)
         });
+        saveCurrentDataSiswa(dataSiswa);
         input.value = '';
         renderTabelSiswa();
-        showToast(`✅ Siswa ${nama} (Kelas ${kelas}) berhasil ditambahkan!`);
+        showToast(`✅ Siswa ${nama} berhasil ditambahkan!`);
     } else {
         showToast("⚠️ Masukkan nama siswa terlebih dahulu!");
     }
 }
 
 function hapusSiswa(index) {
+    let dataSiswa = getDataSiswa();
     if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
         dataSiswa.splice(index, 1);
+        saveCurrentDataSiswa(dataSiswa);
         renderTabelSiswa();
-        showToast("🗑️️ Siswa berhasil dihapus");
+        showToast("🗑 Siswa berhasil dihapus");
     }
 }
 
-/* LOGIKA REKAPITULASI TAHUNAN (DIPERBARUI SESUAI TAHUN TERPILIH) */
+/* LOGIKA REKAPITULASI TAHUNAN */
 function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
     if (!tbody) return;
 
-    const selectedYear = document.getElementById('filterTahunRecap') ? document.getElementById('filterTahunRecap').value : '2026';
+    const selectedYear = getSelectedYear();
     const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
     let kasSiswaBulan = new Array(12).fill(0);
     let transaksiMasukBulan = new Array(12).fill(0);
     let transaksiKeluarBulan = new Array(12).fill(0);
 
-    // Hitung transaksi manual berdasarkan tahun yang dipilih pada filter rekap
+    // Hitung transaksi manual berdasarkan tahun terpilih
     transactions.forEach(item => {
         if (!item.tanggal) return;
-        const parts = item.tanggal.split('-'); // Format: YYYY-MM-DD
+        const parts = item.tanggal.split('-');
         const itemYear = parts[0];
         const itemMonthIdx = parseInt(parts[1], 10) - 1;
 
@@ -144,7 +171,8 @@ function renderRecapTahunan() {
         }
     });
 
-    // Hitung kas siswa dari checklist
+    // Hitung kas siswa dari checklist sesuai tahun yang sedang dipilih
+    let dataSiswa = getDataSiswa();
     dataSiswa.forEach(siswa => {
         siswa.bulan.forEach((lunas, indexBulan) => {
             if (lunas) {
@@ -514,6 +542,7 @@ function updateSummary() {
     });
 
     let totalKasChecklist = 0;
+    let dataSiswa = getDataSiswa();
     dataSiswa.forEach(siswa => {
         const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
         totalKasChecklist += jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
