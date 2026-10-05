@@ -15,12 +15,28 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let transactions = [];
 let heartbeatTimer = null;
 
+/* GENERATE OTO TAHUN PADA DROPDOWN */
+function generateYearOptions() {
+    const select = document.getElementById('filterTahunRecap');
+    if (!select) return;
+    select.innerHTML = '';
+    
+    const currentYear = new Date().getFullYear();
+    for (let y = 2024; y <= currentYear + 5; y++) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === currentYear) opt.selected = true;
+        select.appendChild(opt);
+    }
+}
+
 /* LOGIKA FITUR CHECKLIST BULANAN BERDASARKAN TAHUN TERPILIH */
 const NOMINAL_KAS_PER_BULAN = 2000;
 
 function getSelectedYear() {
     const el = document.getElementById('filterTahunRecap');
-    return el ? el.value : '2026';
+    return el ? el.value : new Date().getFullYear().toString();
 }
 
 function getDataSiswa() {
@@ -418,6 +434,7 @@ async function checkLogin() {
         document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
 
         startHeartbeat(userEmail);
+        generateYearOptions(); // Generate pilihan tahun otomatis saat login sukses
         renderTabelSiswa();
         loadTransactions();
     } else {
