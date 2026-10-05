@@ -1,0 +1,20 @@
+{
+  "name": "Kas Sekolah",
+  "short_name": "Kas Sekolah",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#06221d",
+  "theme_color": "#06221d",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
