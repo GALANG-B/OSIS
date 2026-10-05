@@ -79,7 +79,7 @@
         </button>
 
         <div id="loginError" class="login-error">
-            ⚠️ Email atau password salah!
+            ⚠️️ Email atau password salah!
         </div>
     </div>
 </div>
@@ -163,6 +163,60 @@
         🔄 Menghubungkan ke database...
     </div>
 
+    <!-- SEKSI REKAPITULASI TAHUNAN & FILTER TAHUN -->
+    <div class="section">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
+            <h2>📊 Rekapitulasi Tahunan</h2>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="filterTahunRecap" style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Pilih Tahun:</label>
+                <select id="filterTahunRecap" onchange="renderTabelSiswa()" style="width: 120px; padding: 8px 12px;">
+                    <option value="2026" selected>2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2027">2027</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="summary" style="margin-bottom: 20px;">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Kas Siswa Tahunan</h3>
+                </div>
+                <strong id="recapKasSiswa" class="masuk">Rp 0</strong>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3>Pemasukan Lainnya</h3>
+                </div>
+                <strong id="recapPemasukanLain" class="masuk">Rp 0</strong>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h3>Pengeluaran Tahunan</h3>
+                </div>
+                <strong id="recapPengeluaran" class="keluar">Rp 0</strong>
+            </div>
+        </div>
+
+        <div class="table-wrap">
+            <table style="min-width: 800px;">
+                <thead>
+                    <tr>
+                        <th>Bulan</th>
+                        <th>Kas Siswa (Checklist)</th>
+                        <th>Pemasukan Lain</th>
+                        <th>Total Pemasukan</th>
+                        <th>Pengeluaran</th>
+                        <th>Saldo Bersih</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyTabelRecap">
+                    <!-- Ditampilkan via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- SEKSI CHECKLIST KAS SISWA (BULANAN) BERDASARKAN KELAS 7 - 12 -->
     <div class="section">
         <h2>☑️ Checklist Pembayaran Kas Siswa (Kelas 7 - 12)</h2>
@@ -226,60 +280,6 @@
                 </thead>
                 <tbody id="bodyTabelSiswa">
                     <!-- Data siswa dimuat melalui JavaScript -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- SEKSI REKAPITULASI TAHUNAN -->
-    <div class="section">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
-            <h2>📊 Rekapitulasi Tahunan</h2>
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="filterTahunRecap" style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Pilih Tahun:</label>
-                <select id="filterTahunRecap" onchange="renderRecapTahunan()" style="width: 120px; padding: 8px 12px;">
-                    <option value="2026" selected>2026</option>
-                    <option value="2025">2025</option>
-                    <option value="2027">2027</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="summary" style="margin-bottom: 20px;">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Kas Siswa Tahunan</h3>
-                </div>
-                <strong id="recapKasSiswa" class="masuk">Rp 0</strong>
-            </div>
-            <div class="card">
-                <div class="card-header">
-                    <h3>Pemasukan Lainnya</h3>
-                </div>
-                <strong id="recapPemasukanLain" class="masuk">Rp 0</strong>
-            </div>
-            <div class="card">
-                <div class="card-header">
-                    <h3>Pengeluaran Tahunan</h3>
-                </div>
-                <strong id="recapPengeluaran" class="keluar">Rp 0</strong>
-            </div>
-        </div>
-
-        <div class="table-wrap">
-            <table style="min-width: 800px;">
-                <thead>
-                    <tr>
-                        <th>Bulan</th>
-                        <th>Kas Siswa (Checklist)</th>
-                        <th>Pemasukan Lain</th>
-                        <th>Total Pemasukan</th>
-                        <th>Pengeluaran</th>
-                        <th>Saldo Bersih</th>
-                    </tr>
-                </thead>
-                <tbody id="bodyTabelRecap">
-                    <!-- Ditampilkan via JS -->
                 </tbody>
             </table>
         </div>
