@@ -80,10 +80,9 @@ function toggleBayar(indexSiswa, indexBulan) {
     renderTabelSiswa();
 }
 
-/* FITUR BARU: Lunas 1 Tahun Sekaligus */
+/* FITUR: Lunas 1 Tahun Sekaligus */
 function lunasSemuaBulan(indexSiswa) {
     const isAllChecked = dataSiswa[indexSiswa].bulan.every(b => b === true);
-    // Jika sudah lunas semua, reset jadi false semua. Jika belum, centang semua.
     dataSiswa[indexSiswa].bulan = new Array(12).fill(!isAllChecked);
     renderTabelSiswa();
     showToast(`✅ Status pembayaran ${dataSiswa[indexSiswa].nama} diperbarui!`);
@@ -113,11 +112,11 @@ function hapusSiswa(index) {
     if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
         dataSiswa.splice(index, 1);
         renderTabelSiswa();
-        showToast("🗑️ Siswa berhasil dihapus");
+        showToast("🗑️️ Siswa berhasil dihapus");
     }
 }
 
-/* LOGIKA REKAPITULASI TAHUNAN */
+/* LOGIKA REKAPITULASI TAHUNAN (DIPERBARUI SESUAI TAHUN TERPILIH) */
 function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
     if (!tbody) return;
@@ -125,20 +124,11 @@ function renderRecapTahunan() {
     const selectedYear = document.getElementById('filterTahunRecap') ? document.getElementById('filterTahunRecap').value : '2026';
     const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 
-    // 1. Hitung total kas siswa per bulan dari Checklist
     let kasSiswaBulan = new Array(12).fill(0);
-    dataSiswa.forEach(siswa => {
-        siswa.bulan.forEach((lunas, indexBulan) => {
-            if (lunas) {
-                kasSiswaBulan[indexBulan] += NOMINAL_KAS_PER_BULAN;
-            }
-        });
-    });
-
-    // 2. Hitung transaksi manual (pemasukan/pengeluaran) sesuai tahun terpilih
     let transaksiMasukBulan = new Array(12).fill(0);
     let transaksiKeluarBulan = new Array(12).fill(0);
 
+    // Hitung transaksi manual berdasarkan tahun yang dipilih pada filter rekap
     transactions.forEach(item => {
         if (!item.tanggal) return;
         const parts = item.tanggal.split('-'); // Format: YYYY-MM-DD
@@ -154,7 +144,15 @@ function renderRecapTahunan() {
         }
     });
 
-    // 3. Render tabel rekapitulasi & hitung total tahunan
+    // Hitung kas siswa dari checklist
+    dataSiswa.forEach(siswa => {
+        siswa.bulan.forEach((lunas, indexBulan) => {
+            if (lunas) {
+                kasSiswaBulan[indexBulan] += NOMINAL_KAS_PER_BULAN;
+            }
+        });
+    });
+
     tbody.innerHTML = '';
     let grandKasSiswa = 0;
     let grandPemasukanLain = 0;
@@ -183,7 +181,6 @@ function renderRecapTahunan() {
         tbody.appendChild(tr);
     }
 
-    // Update ringkasan atas seksi rekap
     document.getElementById('recapKasSiswa').textContent = rupiah(grandKasSiswa);
     document.getElementById('recapPemasukanLain').textContent = rupiah(grandPemasukanLain);
     document.getElementById('recapPengeluaran').textContent = rupiah(grandPengeluaran);
@@ -511,23 +508,19 @@ window.deleteTransaction = async function (id) {
 function updateSummary() {
     let masuk = 0, keluar = 0;
     
-    // 1. Hitung transaksi manual (pemasukan/pengeluaran) dari Supabase
     transactions.forEach(item => {
         if (item.jenis === "MASUK") masuk += Number(item.jumlah);
         else if (item.jenis === "KELUAR") keluar += Number(item.jumlah);
     });
 
-    // 2. Hitung otomatis total uang dari checklist siswa (Rp2.000 per bulan yang dicentang)
     let totalKasChecklist = 0;
     dataSiswa.forEach(siswa => {
         const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
         totalKasChecklist += jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
     });
 
-    // Gabungkan total kas checklist ke dalam Total Dana Masuk
     masuk += totalKasChecklist;
 
-    // Tampilkan hasil di kartu ringkasan
     document.getElementById("totalMasuk").textContent = rupiah(masuk);
     document.getElementById("totalKeluar").textContent = rupiah(keluar);
     document.getElementById("saldo").textContent = rupiah(masuk - keluar);
