@@ -14,6 +14,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let transactions = [];
 let heartbeatTimer = null;
+let currentUserRole = 'member'; // Default role
 
 /* GENERATE OTO TAHUN PADA DROPDOWN */
 function generateYearOptions() {
@@ -28,6 +29,50 @@ function generateYearOptions() {
         opt.textContent = y;
         if (y === currentYear) opt.selected = true;
         select.appendChild(opt);
+    }
+}
+
+/* CEK ROLE PENGGUNA DARI TABEL PROFILES */
+async function checkUserRole(email) {
+    try {
+        const { data, error } = await supabaseClient
+            .from('profiles')
+            .select('role')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (data && data.role) {
+            currentUserRole = data.role;
+        } else {
+            currentUserRole = 'member';
+        }
+    } catch (e) {
+        currentUserRole = 'member';
+    }
+
+    terapkanHakAksesUI();
+}
+
+/* MENERAPKAN HAK AKSES UI BERDASARKAN ROLE (OPERATOR / MEMBER) */
+function terapkanHakAksesUI() {
+    const roleBadge = document.getElementById('userRoleBadge');
+    if (roleBadge) {
+        roleBadge.textContent = currentUserRole.toUpperCase();
+        roleBadge.style.background = currentUserRole === 'operator' ? '#059669' : '#d97706';
+    }
+
+    const sectionTambahSiswa = document.getElementById('sectionTambahSiswaContainer');
+    const sectionTambahTransaksi = document.getElementById('sectionTambahTransaksi');
+
+    if (currentUserRole === 'member') {
+        // Sembunyikan form tambah siswa & tambah transaksi untuk member
+        if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'none';
+        if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'none';
+        
+        showToast("ℹ️ Masuk sebagai Member (Hanya dapat melihat data)");
+    } else {
+        if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'flex';
+        if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'block';
     }
 }
 
@@ -61,8 +106,14 @@ function saveCurrentDataSiswa(data) {
 
 function renderTabelSiswa() {
     const tbody = document.getElementById('bodyTabelSiswa');
+    const thAksiSiswa = document.getElementById('thAksiSiswa');
     if (!tbody) return;
     tbody.innerHTML = '';
+
+    // Sembunyikan kolom aksi jika member
+    if (thAksiSiswa) {
+        thAksiSiswa.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
+    }
 
     let dataSiswa = getDataSiswa();
     const filterKelas = document.getElementById('filterKelasSiswa') ? document.getElementById('filterKelasSiswa').value : '';
@@ -85,22 +136,30 @@ function renderTabelSiswa() {
 
             let htmlCheckbox = '';
             siswa.bulan.forEach((lunas, indexBulan) => {
+                const disabledAttr = currentUserRole === 'member' ? 'disabled' : '';
                 htmlCheckbox += `
                     <td style="text-align: center;">
-                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
+                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} ${disabledAttr} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
                     </td>
                 `;
             });
+
+            let htmlAksi = '';
+            if (currentUserRole === 'operator') {
+                htmlAksi = `
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan(${indexSiswaOriginal})" title="Lunas 1 Tahun">Lunas 1Th</button>
+                        <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
+                    </td>
+                `;
+            }
 
             tr.innerHTML = `
                 <td><b>${escapeHTML(siswa.nama)}</b></td>
                 <td><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap;">Kelas ${escapeHTML(siswa.kelas || '-')}</span></td>
                 ${htmlCheckbox}
                 <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
-                <td style="text-align: center; white-space: nowrap;">
-                    <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan(${indexSiswaOriginal})" title="Lunas 1 Tahun">Lunas 1Th</button>
-                    <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
-                </td>
+                ${htmlAksi}
             `;
             tbody.appendChild(tr);
         });
@@ -112,6 +171,11 @@ function renderTabelSiswa() {
 }
 
 function toggleBayar(indexSiswa, indexBulan) {
+    if (currentUserRole !== 'operator') {
+        showToast("⚠️ Anda tidak memiliki izin mengubah data!");
+        renderTabelSiswa();
+        return;
+    }
     let dataSiswa = getDataSiswa();
     dataSiswa[indexSiswa].bulan[indexBulan] = !dataSiswa[indexSiswa].bulan[indexBulan];
     saveCurrentDataSiswa(dataSiswa);
@@ -119,6 +183,7 @@ function toggleBayar(indexSiswa, indexBulan) {
 }
 
 function lunasSemuaBulan(indexSiswa) {
+    if (currentUserRole !== 'operator') return;
     let dataSiswa = getDataSiswa();
     const isAllChecked = dataSiswa[indexSiswa].bulan.every(b => b === true);
     dataSiswa[indexSiswa].bulan = new Array(12).fill(!isAllChecked);
@@ -128,6 +193,7 @@ function lunasSemuaBulan(indexSiswa) {
 }
 
 function tambahSiswa() {
+    if (currentUserRole !== 'operator') return;
     const input = document.getElementById('inputNamaSiswa');
     const selectKelas = document.getElementById('selectKelasSiswa');
     const nama = input.value.trim();
@@ -150,6 +216,7 @@ function tambahSiswa() {
 }
 
 function hapusSiswa(index) {
+    if (currentUserRole !== 'operator') return;
     let dataSiswa = getDataSiswa();
     if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
         dataSiswa.splice(index, 1);
@@ -171,7 +238,6 @@ function renderRecapTahunan() {
     let transaksiMasukBulan = new Array(12).fill(0);
     let transaksiKeluarBulan = new Array(12).fill(0);
 
-    // Hitung transaksi manual berdasarkan tahun terpilih
     transactions.forEach(item => {
         if (!item.tanggal) return;
         const parts = item.tanggal.split('-');
@@ -187,7 +253,6 @@ function renderRecapTahunan() {
         }
     });
 
-    // Hitung kas siswa dari checklist sesuai tahun yang sedang dipilih
     let dataSiswa = getDataSiswa();
     dataSiswa.forEach(siswa => {
         siswa.bulan.forEach((lunas, indexBulan) => {
@@ -233,7 +298,6 @@ function renderRecapTahunan() {
 /* FUNGSI WAKTU REAL TIME */
 function updateRealTimeClock() {
     const now = new Date();
-    
     const optionsDate = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
     const dateFormatted = now.toLocaleDateString('id-ID', optionsDate);
     const timeFormatted = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -326,9 +390,7 @@ async function sendHeartbeat(email) {
             user_email: email,
             last_ping: new Date().toISOString()
         });
-    } catch (e) {
-        console.error("Gagal mengirim heartbeat:", e);
-    }
+    } catch (e) {}
 }
 
 function startHeartbeat(email) {
@@ -433,8 +495,11 @@ async function checkLogin() {
         document.getElementById("dashboard").style.display = "block";
         document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
 
+        // Cek hak akses role pengguna
+        await checkUserRole(userEmail);
+
         startHeartbeat(userEmail);
-        generateYearOptions(); // Generate pilihan tahun otomatis saat login sukses
+        generateYearOptions(); 
         renderTabelSiswa();
         loadTransactions();
     } else {
@@ -459,10 +524,12 @@ function getToday() {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-document.getElementById("tanggal").value = getToday();
+const inputTanggal = document.getElementById("tanggal");
+if (inputTanggal) inputTanggal.value = getToday();
 
 function showToast(message) {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.textContent = message;
     toast.style.display = "block";
     setTimeout(() => { toast.style.display = "none"; }, 2500);
@@ -471,6 +538,7 @@ function showToast(message) {
 /* DATABASE OPERATIONAL */
 async function checkConnection() {
     const status = document.getElementById("connectionStatus");
+    if (!status) return;
     try {
         const { error } = await supabaseClient.from("kas_sekolah").select("id").limit(1);
         status.innerHTML = error ? "🔴 Database tidak terhubung" : "🟢 Database terhubung aktif";
@@ -501,39 +569,51 @@ async function loadTransactions() {
     }
 }
 
-document.getElementById("transactionForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const transaksi = {
-        tanggal: document.getElementById("tanggal").value,
-        jenis: document.getElementById("jenis").value,
-        jumlah: Number(document.getElementById("jumlah").value),
-        kategori: document.getElementById("kategori").value.trim(),
-        pihak: document.getElementById("pihak").value.trim(),
-        metode: document.getElementById("metode").value,
-        keterangan: document.getElementById("keterangan").value.trim()
-    };
-
-    if (!transaksi.jumlah || transaksi.jumlah <= 0) {
-        showToast("❌ Nominal harus lebih dari 0");
-        return;
-    }
-
-    try {
-        const { error } = await supabaseClient.from("kas_sekolah").insert([transaksi]);
-        if (error) {
-            showToast("❌ Gagal menyimpan data");
+const transForm = document.getElementById("transactionForm");
+if (transForm) {
+    transForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (currentUserRole !== 'operator') {
+            showToast("⚠️ Akses ditolak! Hanya operator yang dapat menambah transaksi.");
             return;
         }
-        showToast("✅ Transaksi berhasil dicatat!");
-        this.reset();
-        document.getElementById("tanggal").value = getToday();
-        await loadTransactions();
-    } catch {
-        showToast("❌ Terjadi kesalahan sistem");
-    }
-});
+
+        const transaksi = {
+            tanggal: document.getElementById("tanggal").value,
+            jenis: document.getElementById("jenis").value,
+            jumlah: Number(document.getElementById("jumlah").value),
+            kategori: document.getElementById("kategori").value.trim(),
+            pihak: document.getElementById("pihak").value.trim(),
+            metode: document.getElementById("metode").value,
+            keterangan: document.getElementById("keterangan").value.trim()
+        };
+
+        if (!transaksi.jumlah || transaksi.jumlah <= 0) {
+            showToast("❌ Nominal harus lebih dari 0");
+            return;
+        }
+
+        try {
+            const { error } = await supabaseClient.from("kas_sekolah").insert([transaksi]);
+            if (error) {
+                showToast("❌ Gagal menyimpan data");
+                return;
+            }
+            showToast("✅ Transaksi berhasil dicatat!");
+            this.reset();
+            document.getElementById("tanggal").value = getToday();
+            await loadTransactions();
+        } catch {
+            showToast("❌ Terjadi kesalahan sistem");
+        }
+    });
+}
 
 window.deleteTransaction = async function (id) {
+    if (currentUserRole !== 'operator') {
+        showToast("⚠️ Akses ditolak! Hanya operator yang dapat menghapus transaksi.");
+        return;
+    }
     if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) return;
 
     try {
@@ -567,16 +647,20 @@ function updateSummary() {
 
     masuk += totalKasChecklist;
 
-    document.getElementById("totalMasuk").textContent = rupiah(masuk);
-    document.getElementById("totalKeluar").textContent = rupiah(keluar);
-    document.getElementById("saldo").textContent = rupiah(masuk - keluar);
+    const elMasuk = document.getElementById("totalMasuk");
+    const elKeluar = document.getElementById("totalKeluar");
+    const elSaldo = document.getElementById("saldo");
+
+    if (elMasuk) elMasuk.textContent = rupiah(masuk);
+    if (elKeluar) elKeluar.textContent = rupiah(keluar);
+    if (elSaldo) elSaldo.textContent = rupiah(masuk - keluar);
 }
 
 function getFilteredData() {
-    const search = document.getElementById("search").value.toLowerCase().trim();
-    const tanggal = document.getElementById("filterTanggal").value;
-    const jenis = document.getElementById("filterJenis").value;
-    const kategori = document.getElementById("filterKategori").value.toLowerCase().trim();
+    const search = document.getElementById("search") ? document.getElementById("search").value.toLowerCase().trim() : "";
+    const tanggal = document.getElementById("filterTanggal") ? document.getElementById("filterTanggal").value : "";
+    const jenis = document.getElementById("filterJenis") ? document.getElementById("filterJenis").value : "";
+    const kategori = document.getElementById("filterKategori") ? document.getElementById("filterKategori").value.toLowerCase().trim() : "";
 
     return transactions.filter(item => {
         const text = `${item.kategori || ''} ${item.pihak || ''} ${item.keterangan || ''}`.toLowerCase();
@@ -589,6 +673,13 @@ function getFilteredData() {
 
 function renderTable() {
     const tbody = document.getElementById("transactionTable");
+    const thAksiRiwayat = document.getElementById("thAksiRiwayat");
+    if (!tbody) return;
+
+    if (thAksiRiwayat) {
+        thAksiRiwayat.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
+    }
+
     const data = getFilteredData();
     tbody.innerHTML = "";
 
@@ -599,6 +690,11 @@ function renderTable() {
 
     data.forEach(item => {
         const tr = document.createElement("tr");
+        let htmlAksi = '';
+        if (currentUserRole === 'operator') {
+            htmlAksi = `<td><button class="delete-btn" onclick="deleteTransaction('${item.id}')">Hapus</button></td>`;
+        }
+
         tr.innerHTML = `
             <td>${formatDate(item.tanggal)}</td>
             <td class="${item.jenis === "MASUK" ? "masuk" : "keluar"}">${item.jenis === "MASUK" ? "💸 MASUK" : "📤 KELUAR"}</td>
@@ -607,9 +703,7 @@ function renderTable() {
             <td>${escapeHTML(item.pihak)}</td>
             <td>${escapeHTML(item.metode)}</td>
             <td>${escapeHTML(item.keterangan || "-")}</td>
-            <td>
-                <button class="delete-btn" onclick="deleteTransaction('${item.id}')">Hapus</button>
-            </td>
+            ${htmlAksi}
         `;
         tbody.appendChild(tr);
     });
@@ -627,9 +721,11 @@ function escapeHTML(text) {
 }
 
 ["search", "filterTanggal", "filterKategori"].forEach(id => {
-    document.getElementById(id).addEventListener("input", renderTable);
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", renderTable);
 });
-document.getElementById("filterJenis").addEventListener("change", renderTable);
+const filterJenisEl = document.getElementById("filterJenis");
+if (filterJenisEl) filterJenisEl.addEventListener("change", renderTable);
 
 window.exportCSV = function () {
     const data = getFilteredData();
