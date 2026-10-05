@@ -79,7 +79,7 @@
         </button>
 
         <div id="loginError" class="login-error">
-            ⚠️️ Email atau password salah!
+            ⚠️ Email atau password salah!
         </div>
     </div>
 </div>
@@ -169,11 +169,8 @@
             <h2>📊 Rekapitulasi Tahunan</h2>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="filterTahunRecap" style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Pilih Tahun:</label>
-                <select id="filterTahunRecap" onchange="renderTabelSiswa()" style="width: 120px; padding: 8px 12px;">
-                    <option value="2026" selected>2026</option>
-                    <option value="2025">2025</option>
-                    <option value="2027">2027</option>
-                </select>
+                <!-- Tahun diisi secara otomatis via JS -->
+                <select id="filterTahunRecap" onchange="renderTabelSiswa()" style="width: 120px; padding: 8px 12px;"></select>
             </div>
         </div>
 
