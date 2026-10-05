@@ -15,11 +15,11 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let transactions = [];
 let heartbeatTimer = null;
 
-/* LOGIKA FITUR CHECKLIST BULANAN (RP 2.000 / BULAN) */
+/* LOGIKA FITUR CHECKLIST BULANAN (RP 2.000 / BULAN) KLASIFIKASI KELAS 7-12 */
 const NOMINAL_KAS_PER_BULAN = 2000;
 let dataSiswa = JSON.parse(localStorage.getItem('dataKasSiswaBulanan')) || [
-    { nama: "Ahmad", bulan: [true, true, false, false, false, false, false, false, false, false, false, false] },
-    { nama: "Budi", bulan: [true, false, false, false, false, false, false, false, false, false, false, false] }
+    { nama: "Ahmad", kelas: "7", bulan: [true, true, false, false, false, false, false, false, false, false, false, false] },
+    { nama: "Budi", kelas: "8", bulan: [true, false, false, false, false, false, false, false, false, false, false, false] }
 ];
 
 function renderTabelSiswa() {
@@ -27,12 +27,20 @@ function renderTabelSiswa() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (dataSiswa.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="15" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa 🧑‍🎓</td></tr>`;
+    const filterKelas = document.getElementById('filterKelasSiswa') ? document.getElementById('filterKelasSiswa').value : '';
+
+    const filteredData = dataSiswa.filter(siswa => {
+        if (!filterKelas) return true;
+        return (siswa.kelas || '') === filterKelas;
+    });
+
+    if (filteredData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa untuk kelas ini 🧑‍🎓</td></tr>`;
         return;
     }
 
-    dataSiswa.forEach((siswa, indexSiswa) => {
+    filteredData.forEach((siswa) => {
+        const indexSiswaOriginal = dataSiswa.indexOf(siswa);
         const tr = document.createElement('tr');
         const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
         const totalBayar = jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
@@ -41,17 +49,18 @@ function renderTabelSiswa() {
         siswa.bulan.forEach((lunas, indexBulan) => {
             htmlCheckbox += `
                 <td style="text-align: center;">
-                    <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswa}, ${indexBulan})">
+                    <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
                 </td>
             `;
         });
 
         tr.innerHTML = `
             <td><b>${escapeHTML(siswa.nama)}</b></td>
+            <td><span style="background: rgba(16, 185, 129, 0.15); color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 12px; white-space: nowrap;">Kelas ${escapeHTML(siswa.kelas || '-')}</span></td>
             ${htmlCheckbox}
             <td class="masuk" style="white-space: nowrap;">${rupiah(totalBayar)}</td>
             <td style="text-align: center;">
-                <button class="delete-btn" onclick="hapusSiswa(${indexSiswa})">✕</button>
+                <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -67,15 +76,19 @@ function toggleBayar(indexSiswa, indexBulan) {
 
 function tambahSiswa() {
     const input = document.getElementById('inputNamaSiswa');
+    const selectKelas = document.getElementById('selectKelasSiswa');
     const nama = input.value.trim();
+    const kelas = selectKelas ? selectKelas.value : '7';
+
     if (nama !== '') {
         dataSiswa.push({
             nama: nama,
+            kelas: kelas,
             bulan: new Array(12).fill(false)
         });
         input.value = '';
         renderTabelSiswa();
-        showToast("✅ Siswa berhasil ditambahkan!");
+        showToast(`✅ Siswa ${nama} (Kelas ${kelas}) berhasil ditambahkan!`);
     } else {
         showToast("⚠️ Masukkan nama siswa terlebih dahulu!");
     }
@@ -214,7 +227,7 @@ window.login = async function () {
     const errorElement = document.getElementById("loginError");
 
     if (!emailInput || !passwordInput) {
-        errorElement.textContent = "⚠️ Mohon isi email dan password!";
+        errorElement.textContent = "⚠️️ Mohon isi email dan password!";
         errorElement.style.display = "block";
         return;
     }
