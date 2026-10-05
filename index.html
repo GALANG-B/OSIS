@@ -163,21 +163,45 @@
         🔄 Menghubungkan ke database...
     </div>
 
-    <!-- SEKSI CHECKLIST KAS SISWA (BULANAN) -->
+    <!-- SEKSI CHECKLIST KAS SISWA (BULANAN) BERDASARKAN KELAS 7 - 12 -->
     <div class="section">
-        <h2>☑️ Checklist Pembayaran Kas Siswa (Bulanan)</h2>
+        <h2>☑️ Checklist Pembayaran Kas Siswa (Kelas 7 - 12)</h2>
         <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Pencatatan kas bulanan siswa (Rp2.000/bulan per bulan lunas)</p>
 
-        <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
-            <input type="text" id="inputNamaSiswa" placeholder="Masukkan nama siswa baru..." style="flex: 1; min-width: 220px;">
+        <!-- INPUT TAMBAH SISWA & KLASIFIKASI KELAS -->
+        <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="inputNamaSiswa" placeholder="Masukkan nama siswa baru..." style="flex: 2; min-width: 180px;">
+            <select id="selectKelasSiswa" style="flex: 1; min-width: 120px;">
+                <option value="7">Kelas 7</option>
+                <option value="8">Kelas 8</option>
+                <option value="9">Kelas 9</option>
+                <option value="10">Kelas 10</option>
+                <option value="11">Kelas 11</option>
+                <option value="12">Kelas 12</option>
+            </select>
             <button type="button" class="save-btn" onclick="tambahSiswa()" style="width: auto; padding: 12px 20px;">+ Tambah Siswa</button>
         </div>
 
+        <!-- FILTER KLASIFIKASI KELAS -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 12px;">
+            <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">🔍 Filter Tampilan Kelas:</span>
+            <select id="filterKelasSiswa" onchange="renderTabelSiswa()" style="max-width: 220px;">
+                <option value="">Semua Kelas (7 - 12)</option>
+                <option value="7">Kelas 7</option>
+                <option value="8">Kelas 8</option>
+                <option value="9">Kelas 9</option>
+                <option value="10">Kelas 10</option>
+                <option value="11">Kelas 11</option>
+                <option value="12">Kelas 12</option>
+            </select>
+        </div>
+
         <div class="table-wrap">
-            <table style="min-width: 950px;">
+            <table style="min-width: 1000px;">
                 <thead>
                     <tr>
                         <th>Nama Siswa</th>
+                        <th>Kelas</th>
                         <th style="text-align: center;">Jan</th>
                         <th style="text-align: center;">Feb</th>
                         <th style="text-align: center;">Mar</th>
