@@ -67,8 +67,9 @@ function renderTabelSiswa() {
 
     localStorage.setItem('dataKasSiswaBulanan', JSON.stringify(dataSiswa));
     
-    // OTOMATIS HITUNG ULANG RINGKASAN SISA SALDO & UANG MASUK
+    // OTOMATIS HITUNG ULANG RINGKASAN SALDO & REKAP TAHUNAN
     updateSummary();
+    renderRecapTahunan();
 }
 
 function toggleBayar(indexSiswa, indexBulan) {
@@ -102,6 +103,78 @@ function hapusSiswa(index) {
         renderTabelSiswa();
         showToast("🗑️ Siswa berhasil dihapus");
     }
+}
+
+/* LOGIKA REKAPITULASI TAHUNAN */
+function renderRecapTahunan() {
+    const tbody = document.getElementById('bodyTabelRecap');
+    if (!tbody) return;
+
+    const selectedYear = document.getElementById('filterTahunRecap') ? document.getElementById('filterTahunRecap').value : '2026';
+    const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+    // 1. Hitung total kas siswa per bulan dari Checklist
+    let kasSiswaBulan = new Array(12).fill(0);
+    dataSiswa.forEach(siswa => {
+        siswa.bulan.forEach((lunas, indexBulan) => {
+            if (lunas) {
+                kasSiswaBulan[indexBulan] += NOMINAL_KAS_PER_BULAN;
+            }
+        });
+    });
+
+    // 2. Hitung transaksi manual (pemasukan/pengeluaran) sesuai tahun terpilih
+    let transaksiMasukBulan = new Array(12).fill(0);
+    let transaksiKeluarBulan = new Array(12).fill(0);
+
+    transactions.forEach(item => {
+        if (!item.tanggal) return;
+        const parts = item.tanggal.split('-'); // Format: YYYY-MM-DD
+        const itemYear = parts[0];
+        const itemMonthIdx = parseInt(parts[1], 10) - 1;
+
+        if (itemYear === selectedYear && itemMonthIdx >= 0 && itemMonthIdx < 12) {
+            if (item.jenis === "MASUK") {
+                transaksiMasukBulan[itemMonthIdx] += Number(item.jumlah);
+            } else if (item.jenis === "KELUAR") {
+                transaksiKeluarBulan[itemMonthIdx] += Number(item.jumlah);
+            }
+        }
+    });
+
+    // 3. Render tabel rekapitulasi & hitung total tahunan
+    tbody.innerHTML = '';
+    let grandKasSiswa = 0;
+    let grandPemasukanLain = 0;
+    let grandPengeluaran = 0;
+
+    for (let i = 0; i < 12; i++) {
+        const kasSiswa = kasSiswaBulan[i];
+        const masukaLain = transaksiMasukBulan[i];
+        const totalMasuk = kasSiswa + masukaLain;
+        const pengeluaran = transaksiKeluarBulan[i];
+        const saldoBersih = totalMasuk - pengeluaran;
+
+        grandKasSiswa += kasSiswa;
+        grandPemasukanLain += masukaLain;
+        grandPengeluaran += pengeluaran;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><b>${namaBulan[i]}</b></td>
+            <td class="masuk">${rupiah(kasSiswa)}</td>
+            <td class="masuk">${rupiah(masukaLain)}</td>
+            <td class="masuk" style="font-weight: 700;">${rupiah(totalMasuk)}</td>
+            <td class="keluar">${rupiah(pengeluaran)}</td>
+            <td style="font-weight: 700; color: ${saldoBersih >= 0 ? '#34d399' : '#f87171'}">${rupiah(saldoBersih)}</td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    // Update ringkasan atas seksi rekap
+    document.getElementById('recapKasSiswa').textContent = rupiah(grandKasSiswa);
+    document.getElementById('recapPemasukanLain').textContent = rupiah(grandPemasukanLain);
+    document.getElementById('recapPengeluaran').textContent = rupiah(grandPengeluaran);
 }
 
 /* FUNGSI WAKTU REAL TIME */
@@ -368,6 +441,7 @@ async function loadTransactions() {
         transactions = data || [];
         updateSummary();
         renderTable();
+        renderRecapTahunan();
     } catch {
         showToast("❌ Terjadi kesalahan jaringan");
     }
