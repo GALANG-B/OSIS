@@ -182,18 +182,24 @@
             <button type="button" class="save-btn" onclick="tambahSiswa()" style="width: auto; padding: 12px 20px;">+ Tambah Siswa</button>
         </div>
 
-        <!-- FILTER KLASIFIKASI KELAS -->
+        <!-- FILTER & PENCARIAN KELAS -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 12px;">
-            <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">🔍 Filter Tampilan Kelas:</span>
-            <select id="filterKelasSiswa" onchange="renderTabelSiswa()" style="max-width: 220px;">
-                <option value="">Semua Kelas (7 - 12)</option>
-                <option value="7">Kelas 7</option>
-                <option value="8">Kelas 8</option>
-                <option value="9">Kelas 9</option>
-                <option value="10">Kelas 10</option>
-                <option value="11">Kelas 11</option>
-                <option value="12">Kelas 12</option>
-            </select>
+            <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px;">
+                <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">🔍 Cari Siswa:</span>
+                <input type="text" id="searchSiswa" placeholder="Ketik nama siswa..." oninput="renderTabelSiswa()" style="padding: 8px 12px; font-size: 13px;">
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Filter Kelas:</span>
+                <select id="filterKelasSiswa" onchange="renderTabelSiswa()" style="width: 160px; padding: 8px 12px;">
+                    <option value="">Semua (7 - 12)</option>
+                    <option value="7">Kelas 7</option>
+                    <option value="8">Kelas 8</option>
+                    <option value="9">Kelas 9</option>
+                    <option value="10">Kelas 10</option>
+                    <option value="11">Kelas 11</option>
+                    <option value="12">Kelas 12</option>
+                </select>
+            </div>
         </div>
 
         <div class="table-wrap">
