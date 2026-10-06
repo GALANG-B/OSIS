@@ -271,9 +271,8 @@ window.exportPDF = function () {
     const doc = new jsPDF();
     const selectedYear = getSelectedYear();
 
-    // Judul Dokumen
     doc.setFontSize(16);
-    doc.setTextColor(16, 185, 129); // Warna hijau kas sekolah
+    doc.setTextColor(16, 185, 129);
     doc.text("LAPORAN KAS SEKOLAH", 14, 20);
 
     doc.setFontSize(11);
@@ -281,7 +280,6 @@ window.exportPDF = function () {
     doc.text(`Tahun Periode: ${selectedYear}`, 14, 28);
     doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 34);
 
-    // Ambil Data Riwayat Transaksi yang sedang difilter
     const data = getFilteredData();
     
     if (data.length === 0) {
@@ -289,7 +287,6 @@ window.exportPDF = function () {
         return;
     }
 
-    // Ubah data transaksi menjadi format tabel PDF
     const tableRows = data.map((item, index) => [
         index + 1,
         formatDate(item.tanggal),
@@ -300,13 +297,12 @@ window.exportPDF = function () {
         item.keterangan || '-'
     ]);
 
-    // Buat Tabel Menggunakan jsPDF AutoTable
     doc.autoTable({
         startY: 42,
         head: [['No', 'Tanggal', 'Jenis', 'Jumlah', 'Kategori', 'Pihak', 'Keterangan']],
         body: tableRows,
         theme: 'grid',
-        headStyles: { fillColor: [6, 78, 59] }, // Hijau gelap
+        headStyles: { fillColor: [6, 78, 59] },
         styles: { fontSize: 9, cellPadding: 3 },
         columnStyles: {
             0: { halign: 'center', cellWidth: 10 },
@@ -314,18 +310,18 @@ window.exportPDF = function () {
         }
     });
 
-    // Simpan file PDF otomatis terunduh
     doc.save(`Laporan-Kas-Sekolah-${selectedYear}.pdf`);
     showToast("✅ Berhasil mengunduh Laporan PDF!");
 };
 
-/* LOGIKA REKAPITULASI TAHUNAN */
+/* LOGIKA REKAPITULASI TAHUNAN & GRAFIK KEUANGAN */
 function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
     if (!tbody) return;
 
     const selectedYear = getSelectedYear();
-    const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const namaBulanFull = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    const namaBulanSingkat = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
 
     let kasSiswaBulan = new Array(12).fill(0);
     let transaksiMasukBulan = new Array(12).fill(0);
@@ -360,6 +356,8 @@ function renderRecapTahunan() {
     let grandPemasukanLain = 0;
     let grandPengeluaran = 0;
 
+    let totalMasukGrafik = [];
+
     for (let i = 0; i < 12; i++) {
         const kasSiswa = kasSiswaBulan[i];
         const masukaLain = transaksiMasukBulan[i];
@@ -371,9 +369,11 @@ function renderRecapTahunan() {
         grandPemasukanLain += masukaLain;
         grandPengeluaran += pengeluaran;
 
+        totalMasukGrafik.push(totalMasuk);
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td><b>${namaBulan[i]}</b></td>
+            <td><b>${namaBulanFull[i]}</b></td>
             <td class="masuk">${rupiah(kasSiswa)}</td>
             <td class="masuk">${rupiah(masukaLain)}</td>
             <td class="masuk" style="font-weight: 700;">${rupiah(totalMasuk)}</td>
@@ -386,6 +386,66 @@ function renderRecapTahunan() {
     document.getElementById('recapKasSiswa').textContent = rupiah(grandKasSiswa);
     document.getElementById('recapPemasukanLain').textContent = rupiah(grandPemasukanLain);
     document.getElementById('recapPengeluaran').textContent = rupiah(grandPengeluaran);
+
+    // Panggil fungsi render Grafik Chart.js
+    renderGrafikKeuangan(namaBulanSingkat, totalMasukGrafik, transaksiKeluarBulan);
+}
+
+/* FITUR GRAFIK KEUANGAN (CHART.JS) */
+let myChart = null;
+
+function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
+    const canvasElement = document.getElementById('grafikKeuangan');
+    if (!canvasElement) return;
+
+    if (myChart) {
+        myChart.destroy();
+    }
+
+    const ctx = canvasElement.getContext('2d');
+    myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labelsBulan,
+            datasets: [
+                {
+                    label: 'Pemasukan (Rp)',
+                    data: dataMasuk,
+                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                    borderColor: '#10b981',
+                    borderWidth: 2,
+                    borderRadius: 6
+                },
+                {
+                    label: 'Pengeluaran (Rp)',
+                    data: dataKeluar,
+                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#e2e8f0', font: { family: 'Plus Jakarta Sans' } }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#94a3b8' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                },
+                y: {
+                    ticks: { color: '#94a3b8' },
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                }
+            }
+        }
+    });
 }
 
 /* FUNGSI WAKTU REAL TIME */
