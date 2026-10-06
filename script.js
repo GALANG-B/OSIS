@@ -260,6 +260,65 @@ window.kirimNotifWA = function (indexSiswa) {
     window.open(waUrl, '_blank');
 };
 
+/* FITUR CETAK LAPORAN KE PDF */
+window.exportPDF = function () {
+    const { jsPDF } = window.jspdf;
+    if (!jsPDF) {
+        showToast("❌ Library PDF belum dimuat!");
+        return;
+    }
+
+    const doc = new jsPDF();
+    const selectedYear = getSelectedYear();
+
+    // Judul Dokumen
+    doc.setFontSize(16);
+    doc.setTextColor(16, 185, 129); // Warna hijau kas sekolah
+    doc.text("LAPORAN KAS SEKOLAH", 14, 20);
+
+    doc.setFontSize(11);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Tahun Periode: ${selectedYear}`, 14, 28);
+    doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 14, 34);
+
+    // Ambil Data Riwayat Transaksi yang sedang difilter
+    const data = getFilteredData();
+    
+    if (data.length === 0) {
+        showToast("⚠️ Tidak ada data transaksi untuk dicetak ke PDF");
+        return;
+    }
+
+    // Ubah data transaksi menjadi format tabel PDF
+    const tableRows = data.map((item, index) => [
+        index + 1,
+        formatDate(item.tanggal),
+        item.jenis,
+        rupiah(item.jumlah),
+        item.kategori || '-',
+        item.pihak || '-',
+        item.keterangan || '-'
+    ]);
+
+    // Buat Tabel Menggunakan jsPDF AutoTable
+    doc.autoTable({
+        startY: 42,
+        head: [['No', 'Tanggal', 'Jenis', 'Jumlah', 'Kategori', 'Pihak', 'Keterangan']],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillColor: [6, 78, 59] }, // Hijau gelap
+        styles: { fontSize: 9, cellPadding: 3 },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 10 },
+            3: { halign: 'right' }
+        }
+    });
+
+    // Simpan file PDF otomatis terunduh
+    doc.save(`Laporan-Kas-Sekolah-${selectedYear}.pdf`);
+    showToast("✅ Berhasil mengunduh Laporan PDF!");
+};
+
 /* LOGIKA REKAPITULASI TAHUNAN */
 function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
@@ -478,7 +537,7 @@ window.login = async function () {
             isLockedOut();
         } else {
             const remaining = MAX_LOGIN_ATTEMPTS - attempts;
-            errorElement.textContent = `⚠️️ Email atau password salah! (Sisa percobaan: ${remaining})`;
+            errorElement.textContent = `⚠ Email atau password salah! (Sisa percobaan: ${remaining})`;
             errorElement.style.display = "block";
         }
     } else {
