@@ -22,6 +22,10 @@
 <!-- SUPABASE CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- CDN jsPDF & AutoTable UNTUK CETAK PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
 <!-- GOOGLE FONTS (PLUS JAKARTA SANS) -->
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -349,6 +353,11 @@
 
             <button type="button" class="export-btn" onclick="exportCSV()">
                 📥 Export ke CSV
+            </button>
+
+            <!-- TOMBOL CETAK PDF BARU -->
+            <button type="button" class="export-btn" onclick="exportPDF()" style="background: #dc2626; margin-left: 8px;">
+                📄 Cetak PDF
             </button>
         </div>
 
