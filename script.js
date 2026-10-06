@@ -65,7 +65,6 @@ function terapkanHakAksesUI() {
     const sectionTambahTransaksi = document.getElementById('sectionTambahTransaksi');
 
     if (currentUserRole === 'member') {
-        // Sembunyikan form tambah siswa & tambah transaksi untuk member
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'none';
         if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'none';
         
@@ -110,7 +109,6 @@ function renderTabelSiswa() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    // Sembunyikan kolom aksi jika member
     if (thAksiSiswa) {
         thAksiSiswa.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
     }
@@ -148,6 +146,7 @@ function renderTabelSiswa() {
             if (currentUserRole === 'operator') {
                 htmlAksi = `
                     <td style="text-align: center; white-space: nowrap;">
+                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background: #2563eb;" onclick="kirimNotifWA(${indexSiswaOriginal})" title="Kirim Tagihan WA">💬 WA</button>
                         <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan(${indexSiswaOriginal})" title="Lunas 1 Tahun">Lunas 1Th</button>
                         <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
                     </td>
@@ -225,6 +224,41 @@ function hapusSiswa(index) {
         showToast("🗑 Siswa berhasil dihapus");
     }
 }
+
+/* FITUR KIRIM NOTIFIKASI TUNGGAKAN KAS KE WHATSAPP */
+window.kirimNotifWA = function (indexSiswa) {
+    let dataSiswa = getDataSiswa();
+    const siswa = dataSiswa[indexSiswa];
+    
+    if (!siswa) return;
+
+    const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    
+    let bulanBelumLunas = [];
+    siswa.bulan.forEach((lunas, idx) => {
+        if (!lunas) {
+            bulanBelumLunas.push(namaBulan[idx]);
+        }
+    });
+
+    if (bulanBelumLunas.length === 0) {
+        showToast(`🎉 Pembayaran ${siswa.nama} sudah lunas 1 tahun!`);
+        return;
+    }
+
+    const totalTunggakan = bulanBelumLunas.length * NOMINAL_KAS_PER_BULAN;
+    const tahunTerpilih = getSelectedYear();
+
+    let pesan = `Halo *${siswa.nama}* (Kelas ${siswa.kelas || '-'}),\n\n`;
+    pesan += `Berikut adalah pemberitahuan tagihan kas sekolah tahun ${tahunTerpilih} yang belum lunas:\n`;
+    pesan += `• *Bulan Belum Lunas*:\n  - ${bulanBelumLunas.join('\n  - ')}\n\n`;
+    pesan += `• *Total Tunggakan*: ${rupiah(totalTunggakan)}\n\n`;
+    pesan += `Mohon segera melakukan pembayaran kas kepada bendahara kelas ya. Terima kasih! 🙏`;
+
+    const encodedPesan = encodeURIComponent(pesan);
+    const waUrl = `https://wa.me/?text=${encodedPesan}`;
+    window.open(waUrl, '_blank');
+};
 
 /* LOGIKA REKAPITULASI TAHUNAN */
 function renderRecapTahunan() {
@@ -444,7 +478,7 @@ window.login = async function () {
             isLockedOut();
         } else {
             const remaining = MAX_LOGIN_ATTEMPTS - attempts;
-            errorElement.textContent = `⚠️ Email atau password salah! (Sisa percobaan: ${remaining})`;
+            errorElement.textContent = `⚠️️ Email atau password salah! (Sisa percobaan: ${remaining})`;
             errorElement.style.display = "block";
         }
     } else {
@@ -495,7 +529,6 @@ async function checkLogin() {
         document.getElementById("dashboard").style.display = "block";
         document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
 
-        // Cek hak akses role pengguna
         await checkUserRole(userEmail);
 
         startHeartbeat(userEmail);
