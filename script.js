@@ -387,11 +387,11 @@ function renderRecapTahunan() {
     document.getElementById('recapPemasukanLain').textContent = rupiah(grandPemasukanLain);
     document.getElementById('recapPengeluaran').textContent = rupiah(grandPengeluaran);
 
-    // Panggil fungsi render Grafik Chart.js
+    // Panggil fungsi render Grafik Chart.js Modern
     renderGrafikKeuangan(namaBulanSingkat, totalMasukGrafik, transaksiKeluarBulan);
 }
 
-/* FITUR GRAFIK KEUANGAN (CHART.JS) */
+/* FITUR GRAFIK KEUANGAN (CHART.JS - MODERN DESIGN) */
 let myChart = null;
 
 function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
@@ -403,26 +403,44 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
     }
 
     const ctx = canvasElement.getContext('2d');
+
+    // Membuat efek gradasi warna untuk area bawah garis
+    let gradientMasuk = ctx.createLinearGradient(0, 0, 0, 250);
+    gradientMasuk.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+    gradientMasuk.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+    let gradientKeluar = ctx.createLinearGradient(0, 0, 0, 250);
+    gradientKeluar.addColorStop(0, 'rgba(239, 68, 68, 0.4)');
+    gradientKeluar.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
+
     myChart = new Chart(ctx, {
-        type: 'bar',
+        type: 'line', // Menggunakan tipe line agar terlihat lebih bersih dan elegan
         data: {
             labels: labelsBulan,
             datasets: [
                 {
                     label: 'Pemasukan (Rp)',
                     data: dataMasuk,
-                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                    backgroundColor: gradientMasuk,
                     borderColor: '#10b981',
-                    borderWidth: 2,
-                    borderRadius: 6
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3, // Membuat garis melengkung halus (smooth curve)
+                    pointBackgroundColor: '#10b981',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 },
                 {
                     label: 'Pengeluaran (Rp)',
                     data: dataKeluar,
-                    backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                    backgroundColor: gradientKeluar,
                     borderColor: '#ef4444',
-                    borderWidth: 2,
-                    borderRadius: 6
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#ef4444',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 }
             ]
         },
@@ -431,16 +449,45 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    labels: { color: '#e2e8f0', font: { family: 'Plus Jakarta Sans' } }
+                    position: 'top',
+                    labels: { 
+                        color: '#f1f5f9', 
+                        font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' },
+                        boxWidth: 14,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let value = context.raw || 0;
+                            return ` ${context.dataset.label}: Rp ${value.toLocaleString('id-ID')}`;
+                        }
+                    }
                 }
             },
             scales: {
                 x: {
-                    ticks: { color: '#94a3b8' },
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                    ticks: { 
+                        color: '#cbd5e1', 
+                        font: { family: 'Plus Jakarta Sans', size: 11 },
+                        maxRotation: 0 
+                    },
+                    grid: { display: false }
                 },
                 y: {
-                    ticks: { color: '#94a3b8' },
+                    ticks: { 
+                        color: '#cbd5e1', 
+                        font: { family: 'Plus Jakarta Sans', size: 10 },
+                        callback: function(value) {
+                            if (value >= 1000000) {
+                                return (value / 1000000) + 'jt';
+                            } else if (value >= 1000) {
+                                return (value / 1000) + 'rb';
+                            }
+                            return value;
+                        }
+                    },
                     grid: { color: 'rgba(255, 255, 255, 0.05)' }
                 }
             }
