@@ -12,7 +12,7 @@
 <meta name="theme-color" content="#064e3b">
 <link rel="manifest" href="manifest.json">
 
-<!-- IKON APLIKASI (FAVICON & HOMESCREEN ICON) -->
+<!-- IKON APLIKASI -->
 <link rel="icon" href="logo.png" type="image/png">
 <link rel="apple-touch-icon" href="logo.png">
 
@@ -29,6 +29,9 @@
 <!-- CDN Chart.js UNTUK GRAFIK KEUANGAN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- CDN SweetAlert2 UNTUK NOTIFIKASI MODERN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <!-- GOOGLE FONTS (PLUS JAKARTA SANS) -->
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -38,12 +41,9 @@
 <!-- BACKGROUND AMBIENT GLOW -->
 <div class="bg-glow"></div>
 
-<!-- =====================================================
-     HALAMAN LOGIN
-===================================================== -->
+<!-- HALAMAN LOGIN -->
 <div id="loginPage">
     <div class="login-box">
-        <!-- JAM REAL TIME HALAMAN LOGIN -->
         <div class="login-clock-badge" id="loginClock">
             🕒 Mengambil waktu...
         </div>
@@ -91,9 +91,7 @@
     </div>
 </div>
 
-<!-- =====================================================
-     DASHBOARD (HALAMAN KEDUA)
-===================================================== -->
+<!-- DASHBOARD -->
 <div id="dashboard">
 <header>
     <div class="header-container">
@@ -177,7 +175,6 @@
             <h2>📊 Rekapitulasi Tahunan</h2>
             <div style="display: flex; align-items: center; gap: 8px;">
                 <label for="filterTahunRecap" style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Pilih Tahun:</label>
-                <!-- Tahun diisi secara otomatis via JS -->
                 <select id="filterTahunRecap" onchange="renderTabelSiswa()" style="width: 120px; padding: 8px 12px;"></select>
             </div>
         </div>
@@ -215,9 +212,7 @@
                         <th>Saldo Bersih</th>
                     </tr>
                 </thead>
-                <tbody id="bodyTabelRecap">
-                    <!-- Ditampilkan via JS -->
-                </tbody>
+                <tbody id="bodyTabelRecap"></tbody>
             </table>
         </div>
     </div>
@@ -232,12 +227,11 @@
         </div>
     </div>
 
-    <!-- SEKSI CHECKLIST KAS SISWA (BULANAN) BERDASARKAN KELAS 7 - 12 -->
+    <!-- SEKSI CHECKLIST KAS SISWA -->
     <div class="section">
         <h2>☑️ Checklist Pembayaran Kas Siswa (Kelas 7 - 12)</h2>
         <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Pencatatan kas bulanan siswa (Rp2.000/bulan per bulan lunas)</p>
 
-        <!-- INPUT TAMBAH SISWA & KLASIFIKASI KELAS (KHUSUS OPERATOR) -->
         <div id="sectionTambahSiswaContainer" style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
             <input type="text" id="inputNamaSiswa" placeholder="Masukkan nama siswa baru..." style="flex: 2; min-width: 180px;">
             <select id="selectKelasSiswa" style="flex: 1; min-width: 120px;">
@@ -251,7 +245,6 @@
             <button type="button" class="save-btn" onclick="tambahSiswa()" style="width: auto; padding: 12px 20px;">+ Tambah Siswa</button>
         </div>
 
-        <!-- FILTER & PENCARIAN KELAS -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 12px;">
             <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px;">
                 <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">🔍 Cari Siswa:</span>
@@ -293,14 +286,12 @@
                         <th id="thAksiSiswa" style="text-align: center;">Aksi</th>
                     </tr>
                 </thead>
-                <tbody id="bodyTabelSiswa">
-                    <!-- Data siswa dimuat melalui JavaScript -->
-                </tbody>
+                <tbody id="bodyTabelSiswa"></tbody>
             </table>
         </div>
     </div>
 
-    <!-- SEKSI TAMBAH TRANSAKSI (KHUSUS OPERATOR) -->
+    <!-- SEKSI TAMBAH TRANSAKSI -->
     <div class="section" id="sectionTambahTransaksi">
         <h2>📝 Tambah Transaksi Kas</h2>
 
@@ -408,8 +399,6 @@
     Sistem Kas Sekolah © 2026 💰💸 All Rights Reserved.
 </footer>
 </div>
-
-<div class="toast" id="toast"></div>
 
 <!-- LINK FILE JAVASCRIPT TERPISAH -->
 <script src="script.js"></script>
