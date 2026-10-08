@@ -14,7 +14,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let transactions = [];
 let heartbeatTimer = null;
-let currentUserRole = 'member'; // Default role
+let currentUserRole = 'member';
 
 /* INTEGRASI SWEETALERT2 NOTIFICATION TOAST */
 const Toast = Swal.mixin({
@@ -43,7 +43,32 @@ function showToast(message) {
     });
 }
 
-/* GENERATE OTO TAHUN PADA DROPDOWN */
+/* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
+function tampilkanSapaanRole() {
+    if (currentUserRole === 'operator') {
+        Swal.fire({
+            icon: 'success',
+            title: 'Halo, Operator! 🛠️',
+            html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola, menambah, dan menghapus data kas.',
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Mulai Kelola Kas',
+            background: '#0f172a',
+            color: '#ffffff'
+        });
+    } else {
+        Swal.fire({
+            icon: 'info',
+            title: 'Selamat Datang! 👋',
+            html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas.',
+            confirmButtonColor: '#2563eb',
+            confirmButtonText: 'Lihat Laporan',
+            background: '#0f172a',
+            color: '#ffffff'
+        });
+    }
+}
+
+/* GENERATE DROPDOWN TAHUN */
 function generateYearOptions() {
     const select = document.getElementById('filterTahunRecap');
     if (!select) return;
@@ -94,15 +119,13 @@ function terapkanHakAksesUI() {
     if (currentUserRole === 'member') {
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'none';
         if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'none';
-        
-        showToast("ℹ️ Masuk sebagai Member (Hanya dapat melihat data)");
     } else {
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'flex';
         if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'block';
     }
 }
 
-/* LOGIKA FITUR CHECKLIST BULANAN BERDASARKAN TAHUN TERPILIH */
+/* LOGIKA CHECKLIST KAS SISWA */
 const NOMINAL_KAS_PER_BULAN = 2000;
 
 function getSelectedYear() {
@@ -264,7 +287,7 @@ function hapusSiswa(index) {
     });
 }
 
-/* FITUR KIRIM NOTIFIKASI TUNGGAKAN KAS KE WHATSAPP */
+/* FITUR KIRIM NOTIFIKASI TAGIHAN KAS VIA WHATSAPP */
 window.kirimNotifWA = function (indexSiswa) {
     let dataSiswa = getDataSiswa();
     const siswa = dataSiswa[indexSiswa];
@@ -299,7 +322,7 @@ window.kirimNotifWA = function (indexSiswa) {
     window.open(waUrl, '_blank');
 };
 
-/* FITUR CETAK LAPORAN KE PDF */
+/* FITUR CETAK LAPORAN PDF */
 window.exportPDF = function () {
     const { jsPDF } = window.jspdf;
     if (!jsPDF) {
@@ -353,7 +376,7 @@ window.exportPDF = function () {
     showToast("✅ Berhasil mengunduh Laporan PDF!");
 };
 
-/* LOGIKA REKAPITULASI TAHUNAN & GRAFIK KEUANGAN */
+/* REKAPITULASI TAHUNAN & GRAFIK KEUANGAN */
 function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
     if (!tbody) return;
@@ -429,7 +452,7 @@ function renderRecapTahunan() {
     renderGrafikKeuangan(namaBulanSingkat, totalMasukGrafik, transaksiKeluarBulan);
 }
 
-/* FITUR GRAFIK KEUANGAN (CHART.JS - MODERN DESIGN) */
+/* GRAFIK KEUANGAN (CHART.JS) */
 let myChart = null;
 
 function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
@@ -532,7 +555,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
     });
 }
 
-/* FUNGSI WAKTU REAL TIME */
+/* FUNGSI JAM REAL TIME */
 function updateRealTimeClock() {
     const now = new Date();
     const optionsDate = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
@@ -645,7 +668,7 @@ function stopHeartbeat() {
     }
 }
 
-/* LOGIN */
+/* PROSES LOGIN DENGAN SAPAAN ROLE */
 window.login = async function () {
     if (isLockedOut()) return;
 
@@ -696,10 +719,13 @@ window.login = async function () {
 
         startHeartbeat(data.user.email);
         await checkLogin();
+        
+        /* POP-UP SAPAAN MUNCUL SETELAH SUCCESS LOGIN */
+        tampilkanSapaanRole();
     }
 };
 
-/* LOGOUT */
+/* PROSES LOGOUT */
 window.logout = async function () {
     stopHeartbeat();
     try {
@@ -710,7 +736,7 @@ window.logout = async function () {
     location.reload();
 };
 
-/* CHECK SESSION */
+/* PENGECEKAN SESI AKTIF */
 async function checkLogin() {
     const { data: { session } } = await supabaseClient.auth.getSession();
 
@@ -763,7 +789,7 @@ function getToday() {
 const inputTanggal = document.getElementById("tanggal");
 if (inputTanggal) inputTanggal.value = getToday();
 
-/* DATABASE OPERATIONAL */
+/* KONEKSI & AMBIL DATA TRANSAKSI */
 async function checkConnection() {
     const status = document.getElementById("connectionStatus");
     if (!status) return;
@@ -869,7 +895,7 @@ window.deleteTransaction = async function (id) {
     });
 };
 
-/* FUNGSI UPDATE RINGKASAN TOTAL DANA MASUK & SALDO */
+/* PERHITUNGAN RINGKASAN SALDO */
 function updateSummary() {
     let masuk = 0, keluar = 0;
     
@@ -991,5 +1017,5 @@ window.exportCSV = function () {
     URL.revokeObjectURL(url);
 };
 
-/* RUN ON STARTUP */
+/* MENJALANKAN PENGECEKAN SESI AWAL */
 checkLogin();
