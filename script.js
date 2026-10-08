@@ -16,6 +16,33 @@ let transactions = [];
 let heartbeatTimer = null;
 let currentUserRole = 'member'; // Default role
 
+/* INTEGRASI SWEETALERT2 NOTIFICATION TOAST */
+const Toast = Swal.mixin({
+    toast: true,
+    position: 'top-end',
+    showConfirmButton: false,
+    timer: 3000,
+    timerProgressBar: true,
+    didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer);
+        toast.addEventListener('mouseleave', Swal.resumeTimer);
+    }
+});
+
+function showToast(message) {
+    let iconType = 'info';
+    if (message.includes('✅') || message.includes('🎉')) iconType = 'success';
+    else if (message.includes('❌') || message.includes('🗑') || message.includes('🚫')) iconType = 'error';
+    else if (message.includes('⚠️') || message.includes('⏳')) iconType = 'warning';
+
+    let cleanMessage = message.replace(/[✅🎉❌🗑🚫⚠️⏳ℹ️]/g, '').trim();
+
+    Toast.fire({
+        icon: iconType,
+        title: cleanMessage
+    });
+}
+
 /* GENERATE OTO TAHUN PADA DROPDOWN */
 function generateYearOptions() {
     const select = document.getElementById('filterTahunRecap');
@@ -53,7 +80,7 @@ async function checkUserRole(email) {
     terapkanHakAksesUI();
 }
 
-/* MENERAPKAN HAK AKSES UI BERDASARKAN ROLE (OPERATOR / MEMBER) */
+/* MENERAPKAN HAK AKSES UI BERDASARKAN ROLE */
 function terapkanHakAksesUI() {
     const roleBadge = document.getElementById('userRoleBadge');
     if (roleBadge) {
@@ -217,12 +244,24 @@ function tambahSiswa() {
 function hapusSiswa(index) {
     if (currentUserRole !== 'operator') return;
     let dataSiswa = getDataSiswa();
-    if (confirm(`Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist?`)) {
-        dataSiswa.splice(index, 1);
-        saveCurrentDataSiswa(dataSiswa);
-        renderTabelSiswa();
-        showToast("🗑 Siswa berhasil dihapus");
-    }
+    
+    Swal.fire({
+        title: 'Hapus Siswa?',
+        text: `Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist? Data ini tidak dapat dikembalikan.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            dataSiswa.splice(index, 1);
+            saveCurrentDataSiswa(dataSiswa);
+            renderTabelSiswa();
+            showToast("🗑 Siswa berhasil dihapus");
+        }
+    });
 }
 
 /* FITUR KIRIM NOTIFIKASI TUNGGAKAN KAS KE WHATSAPP */
@@ -387,7 +426,6 @@ function renderRecapTahunan() {
     document.getElementById('recapPemasukanLain').textContent = rupiah(grandPemasukanLain);
     document.getElementById('recapPengeluaran').textContent = rupiah(grandPengeluaran);
 
-    // Panggil fungsi render Grafik Chart.js Modern
     renderGrafikKeuangan(namaBulanSingkat, totalMasukGrafik, transaksiKeluarBulan);
 }
 
@@ -404,7 +442,6 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
 
     const ctx = canvasElement.getContext('2d');
 
-    // Membuat efek gradasi warna untuk area bawah garis
     let gradientMasuk = ctx.createLinearGradient(0, 0, 0, 250);
     gradientMasuk.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
     gradientMasuk.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
@@ -414,7 +451,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
     gradientKeluar.addColorStop(1, 'rgba(239, 68, 68, 0.0)');
 
     myChart = new Chart(ctx, {
-        type: 'line', // Menggunakan tipe line agar terlihat lebih bersih dan elegan
+        type: 'line',
         data: {
             labels: labelsBulan,
             datasets: [
@@ -425,7 +462,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
                     borderColor: '#10b981',
                     borderWidth: 3,
                     fill: true,
-                    tension: 0.3, // Membuat garis melengkung halus (smooth curve)
+                    tension: 0.3,
                     pointBackgroundColor: '#10b981',
                     pointRadius: 4,
                     pointHoverRadius: 6
@@ -726,14 +763,6 @@ function getToday() {
 const inputTanggal = document.getElementById("tanggal");
 if (inputTanggal) inputTanggal.value = getToday();
 
-function showToast(message) {
-    const toast = document.getElementById("toast");
-    if (!toast) return;
-    toast.textContent = message;
-    toast.style.display = "block";
-    setTimeout(() => { toast.style.display = "none"; }, 2500);
-}
-
 /* DATABASE OPERATIONAL */
 async function checkConnection() {
     const status = document.getElementById("connectionStatus");
@@ -813,19 +842,31 @@ window.deleteTransaction = async function (id) {
         showToast("⚠️ Akses ditolak! Hanya operator yang dapat menghapus transaksi.");
         return;
     }
-    if (!confirm("Apakah Anda yakin ingin menghapus transaksi ini?")) return;
-
-    try {
-        const { error } = await supabaseClient.from("kas_sekolah").delete().eq("id", id);
-        if (error) {
-            showToast("❌ Gagal menghapus transaksi");
-            return;
+    
+    Swal.fire({
+        title: 'Hapus Transaksi?',
+        text: "Data kas yang dihapus dari database tidak dapat dikembalikan!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Ya, Hapus Transaksi!',
+        cancelButtonText: 'Batal'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                const { error } = await supabaseClient.from("kas_sekolah").delete().eq("id", id);
+                if (error) {
+                    showToast("❌ Gagal menghapus transaksi");
+                    return;
+                }
+                showToast("🗑 Transaksi berhasil dihapus");
+                await loadTransactions();
+            } catch {
+                showToast("❌ Terjadi kesalahan saat menghapus");
+            }
         }
-        showToast("🗑 Transaksi berhasil dihapus");
-        await loadTransactions();
-    } catch {
-        showToast("❌ Terjadi kesalahan saat menghapus");
-    }
+    });
 };
 
 /* FUNGSI UPDATE RINGKASAN TOTAL DANA MASUK & SALDO */
