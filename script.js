@@ -59,7 +59,7 @@ function tampilkanSapaanRole() {
         Swal.fire({
             icon: 'info',
             title: 'Selamat Datang! 👋',
-            html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas.',
+            html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas. (RAUSAH MACEM–MACEM) ',
             confirmButtonColor: '#2563eb',
             confirmButtonText: 'Lihat Laporan',
             background: '#0f172a',
