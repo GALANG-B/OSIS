@@ -111,6 +111,12 @@
                     ⏰ Mengambil waktu...
                 </div>
 
+                <!-- TOMBOL DARK / LIGHT MODE -->
+                <button type="button" class="theme-btn" onclick="toggleTheme()" id="themeToggleBtn">
+                    <span id="themeIcon">🌙</span>
+                    <span id="themeText">Dark</span>
+                </button>
+
                 <button type="button" class="logout-btn" onclick="logout()">
                     <span>Keluar</span>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -174,7 +180,7 @@
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;">
             <h2>📊 Rekapitulasi Tahunan</h2>
             <div style="display: flex; align-items: center; gap: 8px;">
-                <label for="filterTahunRecap" style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Pilih Tahun:</label>
+                <label for="filterTahunRecap" style="font-size: 13px; font-weight: 600;">Pilih Tahun:</label>
                 <select id="filterTahunRecap" onchange="renderTabelSiswa()" style="width: 120px; padding: 8px 12px;"></select>
             </div>
         </div>
@@ -220,7 +226,7 @@
     <!-- SEKSI GRAFIK KEUANGAN TAHUNAN -->
     <div class="section">
         <h2>📈 Grafik Keuangan Tahunan</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Visualisasi perbandingan pemasukan dan pengeluaran kas per bulan</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Visualisasi perbandingan pemasukan dan pengeluaran kas per bulan</p>
         
         <div style="position: relative; width: 100%; height: 320px; background: rgba(0, 0, 0, 0.15); padding: 15px; border-radius: 12px;">
             <canvas id="grafikKeuangan"></canvas>
@@ -230,7 +236,7 @@
     <!-- SEKSI CHECKLIST KAS SISWA -->
     <div class="section">
         <h2>☑️ Checklist Pembayaran Kas Siswa (Kelas 7 - 12)</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Pencatatan kas bulanan siswa (Rp2.000/bulan per bulan lunas)</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Pencatatan kas bulanan siswa (Rp2.000/bulan per bulan lunas)</p>
 
         <div id="sectionTambahSiswaContainer" style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
             <input type="text" id="inputNamaSiswa" placeholder="Masukkan nama siswa baru..." style="flex: 2; min-width: 180px;">
@@ -245,13 +251,13 @@
             <button type="button" class="save-btn" onclick="tambahSiswa()" style="width: auto; padding: 12px 20px;">+ Tambah Siswa</button>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; background: rgba(0,0,0,0.1); padding: 10px 14px; border-radius: 12px;">
             <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px;">
-                <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">🔍 Cari Siswa:</span>
+                <span style="font-size: 13px; font-weight: 600;">🔍 Cari Siswa:</span>
                 <input type="text" id="searchSiswa" placeholder="Ketik nama siswa..." oninput="renderTabelSiswa()" style="padding: 8px 12px; font-size: 13px;">
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 13px; color: #cbd5e1; font-weight: 600;">Filter Kelas:</span>
+                <span style="font-size: 13px; font-weight: 600;">Filter Kelas:</span>
                 <select id="filterKelasSiswa" onchange="renderTabelSiswa()" style="width: 160px; padding: 8px 12px;">
                     <option value="">Semua (7 - 12)</option>
                     <option value="7">Kelas 7</option>
@@ -398,7 +404,7 @@
     <!-- SEKSI AUDIT LOGS -->
     <div class="section" id="sectionAuditLog">
         <h2>📜 Riwayat Aktivitas Sistem (Audit Log)</h2>
-        <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Catatan rekam jejak otomatis seluruh aktivitas pengurus di sistem</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Catatan rekam jejak otomatis seluruh aktivitas pengurus di sistem</p>
 
         <div class="filter-actions" style="margin-bottom: 12px;">
             <button type="button" class="refresh-btn" onclick="loadAuditLogs()">
