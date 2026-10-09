@@ -126,7 +126,7 @@ function terapkanHakAksesUI() {
     }
 }
 
-/* LOGIKA CHECKLIST KAS SISWA */
+/* LOGIKA CHECKLIST KAS SISWA (BERBASIS SUPABASE) */
 const NOMINAL_KAS_PER_BULAN = 2000;
 
 function getSelectedYear() {
@@ -134,27 +134,23 @@ function getSelectedYear() {
     return el ? el.value : new Date().getFullYear().toString();
 }
 
-function getDataSiswa() {
+async function getDataSiswa() {
     const year = getSelectedYear();
-    const storageKey = 'dataKasSiswaBulanan_' + year;
-    let data = JSON.parse(localStorage.getItem(storageKey));
-    if (!data) {
-        data = [
-            { nama: "Ahmad", kelas: "7", bulan: new Array(12).fill(false) },
-            { nama: "Budi", kelas: "8", bulan: new Array(12).fill(false) }
-        ];
-        localStorage.setItem(storageKey, JSON.stringify(data));
+    try {
+        const { data, error } = await supabaseClient
+            .from('siswa')
+            .select('*')
+            .eq('tahun', year)
+            .order('created_at', { ascending: true });
+
+        if (error || !data) return [];
+        return data;
+    } catch {
+        return [];
     }
-    return data;
 }
 
-function saveCurrentDataSiswa(data) {
-    const year = getSelectedYear();
-    const storageKey = 'dataKasSiswaBulanan_' + year;
-    localStorage.setItem(storageKey, JSON.stringify(data));
-}
-
-function renderTabelSiswa() {
+async function renderTabelSiswa() {
     const tbody = document.getElementById('bodyTabelSiswa');
     const thAksiSiswa = document.getElementById('thAksiSiswa');
     if (!tbody) return;
@@ -164,7 +160,7 @@ function renderTabelSiswa() {
         thAksiSiswa.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
     }
 
-    let dataSiswa = getDataSiswa();
+    let dataSiswa = await getDataSiswa();
     const filterKelas = document.getElementById('filterKelasSiswa') ? document.getElementById('filterKelasSiswa').value : '';
     const searchQuery = document.getElementById('searchSiswa') ? document.getElementById('searchSiswa').value.toLowerCase().trim() : '';
 
@@ -178,17 +174,17 @@ function renderTabelSiswa() {
         tbody.innerHTML = `<tr><td colspan="16" style="text-align:center;color:#888;padding:20px;">Belum ada data siswa untuk tahun ini 🧑‍🎓</td></tr>`;
     } else {
         filteredData.forEach((siswa) => {
-            const indexSiswaOriginal = dataSiswa.indexOf(siswa);
             const tr = document.createElement('tr');
-            const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
+            const bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
+            const jumlahBulanLunas = bulanArr.filter(b => b === true).length;
             const totalBayar = jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
 
             let htmlCheckbox = '';
-            siswa.bulan.forEach((lunas, indexBulan) => {
+            bulanArr.forEach((lunas, indexBulan) => {
                 const disabledAttr = currentUserRole === 'member' ? 'disabled' : '';
                 htmlCheckbox += `
                     <td style="text-align: center;">
-                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} ${disabledAttr} onchange="toggleBayar(${indexSiswaOriginal}, ${indexBulan})">
+                        <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} ${disabledAttr} onchange="toggleBayar('${siswa.id}', ${indexBulan})">
                     </td>
                 `;
             });
@@ -197,9 +193,9 @@ function renderTabelSiswa() {
             if (currentUserRole === 'operator') {
                 htmlAksi = `
                     <td style="text-align: center; white-space: nowrap;">
-                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background: #2563eb;" onclick="kirimNotifWA(${indexSiswaOriginal})" title="Kirim Tagihan WA">💬 WA</button>
-                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan(${indexSiswaOriginal})" title="Lunas 1 Tahun">Lunas 1Th</button>
-                        <button class="delete-btn" onclick="hapusSiswa(${indexSiswaOriginal})">✕</button>
+                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background: #2563eb;" onclick="kirimNotifWA('${siswa.id}')" title="Kirim Tagihan WA">💬 WA</button>
+                        <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px;" onclick="lunasSemuaBulan('${siswa.id}')" title="Lunas 1 Tahun">Lunas 1Th</button>
+                        <button class="delete-btn" onclick="hapusSiswa('${siswa.id}', '${escapeHTML(siswa.nama)}')">✕</button>
                     </td>
                 `;
             }
@@ -215,90 +211,102 @@ function renderTabelSiswa() {
         });
     }
 
-    saveCurrentDataSiswa(dataSiswa);
-    updateSummary();
-    renderRecapTahunan();
+    await updateSummary();
+    await renderRecapTahunan();
 }
 
-function toggleBayar(indexSiswa, indexBulan) {
+async function toggleBayar(idSiswa, indexBulan) {
     if (currentUserRole !== 'operator') {
         showToast("⚠️ Anda tidak memiliki izin mengubah data!");
-        renderTabelSiswa();
+        await renderTabelSiswa();
         return;
     }
-    let dataSiswa = getDataSiswa();
-    dataSiswa[indexSiswa].bulan[indexBulan] = !dataSiswa[indexSiswa].bulan[indexBulan];
-    saveCurrentDataSiswa(dataSiswa);
-    renderTabelSiswa();
+    
+    const { data: siswa } = await supabaseClient.from('siswa').select('bulan').eq('id', idSiswa).single();
+    if (!siswa) return;
+
+    let bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
+    bulanArr[indexBulan] = !bulanArr[indexBulan];
+
+    await supabaseClient.from('siswa').update({ bulan: bulanArr }).eq('id', idSiswa);
+    await renderTabelSiswa();
 }
 
-function lunasSemuaBulan(indexSiswa) {
+async function lunasSemuaBulan(idSiswa) {
     if (currentUserRole !== 'operator') return;
-    let dataSiswa = getDataSiswa();
-    const isAllChecked = dataSiswa[indexSiswa].bulan.every(b => b === true);
-    dataSiswa[indexSiswa].bulan = new Array(12).fill(!isAllChecked);
-    saveCurrentDataSiswa(dataSiswa);
-    renderTabelSiswa();
+
+    const { data: siswa } = await supabaseClient.from('siswa').select('bulan').eq('id', idSiswa).single();
+    if (!siswa) return;
+
+    let bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
+    const isAllChecked = bulanArr.every(b => b === true);
+    const newBulanArr = new Array(12).fill(!isAllChecked);
+
+    await supabaseClient.from('siswa').update({ bulan: newBulanArr }).eq('id', idSiswa);
+    await renderTabelSiswa();
     showToast(`✅ Status pembayaran diperbarui!`);
 }
 
-function tambahSiswa() {
+async function tambahSiswa() {
     if (currentUserRole !== 'operator') return;
     const input = document.getElementById('inputNamaSiswa');
     const selectKelas = document.getElementById('selectKelasSiswa');
     const nama = input.value.trim();
     const kelas = selectKelas ? selectKelas.value : '7';
+    const tahun = getSelectedYear();
 
     if (nama !== '') {
-        let dataSiswa = getDataSiswa();
-        dataSiswa.push({
+        const { error } = await supabaseClient.from('siswa').insert([{
             nama: nama,
             kelas: kelas,
+            tahun: tahun,
             bulan: new Array(12).fill(false)
-        });
-        saveCurrentDataSiswa(dataSiswa);
+        }]);
+
+        if (error) {
+            showToast("❌ Gagal menambahkan siswa!");
+            return;
+        }
+
         input.value = '';
-        renderTabelSiswa();
+        await renderTabelSiswa();
         showToast(`✅ Siswa ${nama} berhasil ditambahkan!`);
     } else {
         showToast("⚠️ Masukkan nama siswa terlebih dahulu!");
     }
 }
 
-function hapusSiswa(index) {
+async function hapusSiswa(idSiswa, namaSiswa) {
     if (currentUserRole !== 'operator') return;
-    let dataSiswa = getDataSiswa();
     
     Swal.fire({
         title: 'Hapus Siswa?',
-        text: `Yakin ingin menghapus ${dataSiswa[index].nama} dari checklist? Data ini tidak dapat dikembalikan.`,
+        text: `Yakin ingin menghapus ${namaSiswa} dari checklist? Data ini tidak dapat dikembalikan.`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Ya, Hapus!',
         cancelButtonText: 'Batal'
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
-            dataSiswa.splice(index, 1);
-            saveCurrentDataSiswa(dataSiswa);
-            renderTabelSiswa();
+            await supabaseClient.from('siswa').delete().eq('id', idSiswa);
+            await renderTabelSiswa();
             showToast("🗑 Siswa berhasil dihapus");
         }
     });
 }
 
 /* FITUR KIRIM NOTIFIKASI TAGIHAN KAS VIA WHATSAPP */
-window.kirimNotifWA = function (indexSiswa) {
-    let dataSiswa = getDataSiswa();
-    const siswa = dataSiswa[indexSiswa];
-    
+window.kirimNotifWA = async function (idSiswa) {
+    const { data: siswa } = await supabaseClient.from('siswa').select('*').eq('id', idSiswa).single();
     if (!siswa) return;
 
     const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-    
     let bulanBelumLunas = [];
-    siswa.bulan.forEach((lunas, idx) => {
+    const bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
+    
+    bulanArr.forEach((lunas, idx) => {
         if (!lunas) {
             bulanBelumLunas.push(namaBulan[idx]);
         }
@@ -378,7 +386,7 @@ window.exportPDF = function () {
 };
 
 /* REKAPITULASI TAHUNAN & GRAFIK KEUANGAN */
-function renderRecapTahunan() {
+async function renderRecapTahunan() {
     const tbody = document.getElementById('bodyTabelRecap');
     if (!tbody) return;
 
@@ -405,9 +413,10 @@ function renderRecapTahunan() {
         }
     });
 
-    let dataSiswa = getDataSiswa();
+    let dataSiswa = await getDataSiswa();
     dataSiswa.forEach(siswa => {
-        siswa.bulan.forEach((lunas, indexBulan) => {
+        const bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : [];
+        bulanArr.forEach((lunas, indexBulan) => {
             if (lunas) {
                 kasSiswaBulan[indexBulan] += NOMINAL_KAS_PER_BULAN;
             }
@@ -639,13 +648,10 @@ async function checkActiveSessionLock(currentEmail, currentRole) {
         const now = Date.now();
         const secondsDiff = (now - lastPing) / 1000;
 
-        // Jika ada sesi lain yang masih aktif dalam 30 detik terakhir
         if (secondsDiff < 30 && data.user_email && data.user_email !== currentEmail) {
-            // OPERATOR KICK MEMBER: Jika yang masuk Operator dan yang aktif Member
             if (currentRole === 'operator' && data.user_role === 'member') {
                 return { locked: false, isKickingMember: true };
             }
-            // MEMBER DITOLAK: Jika yang aktif user lain (Operator / Member lain)
             return { locked: true, activeUser: data.user_email };
         }
 
@@ -681,7 +687,7 @@ function stopHeartbeat() {
     }
 }
 
-/* REALTIME DETECTOR UNTUK TENDANG MEMBER KETIKA OPERATOR MASUK */
+/* REALTIME DETECTOR SESI & PERUBAHAN DATA SISWA */
 function initRealtimeSessionListener(myEmail) {
     if (sessionChannel) {
         supabaseClient.removeChannel(sessionChannel);
@@ -690,10 +696,8 @@ function initRealtimeSessionListener(myEmail) {
     sessionChannel = supabaseClient
         .channel('session_lock_tracker')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'session_lock' }, async (payload) => {
-            // Hanya berlaku untuk akun bertipe Member
             if (currentUserRole === 'member') {
                 const newLock = payload.new;
-                // Jika gembok sesi berubah ke email lain (Operator masuk)
                 if (newLock && newLock.user_email && newLock.user_email !== myEmail) {
                     stopHeartbeat();
                     await supabaseClient.auth.signOut();
@@ -709,6 +713,9 @@ function initRealtimeSessionListener(myEmail) {
                     });
                 }
             }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'siswa' }, async () => {
+            await renderTabelSiswa();
         })
         .subscribe();
 }
@@ -727,7 +734,6 @@ window.login = async function () {
         return;
     }
 
-    // 1. Verifikasi Email & Password ke Supabase Auth
     const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: emailInput,
         password: passwordInput
@@ -747,10 +753,8 @@ window.login = async function () {
             errorElement.style.display = "block";
         }
     } else {
-        // 2. Ambil Role Pengguna Terlebih Dahulu
         await checkUserRole(data.user.email);
 
-        // 3. Cek Proteksi Sesi Aktif dengan Hak Akses Role
         const lockStatus = await checkActiveSessionLock(data.user.email, currentUserRole);
         if (lockStatus.locked) {
             await supabaseClient.auth.signOut();
@@ -759,7 +763,6 @@ window.login = async function () {
             return;
         }
 
-        // Login Berhasil -> Reset Status
         localStorage.removeItem("failedAttempts");
         localStorage.removeItem("lockoutUntil");
         errorElement.style.display = "none";
@@ -773,7 +776,6 @@ window.login = async function () {
         initRealtimeSessionListener(data.user.email);
         await checkLogin();
         
-        /* POP-UP SAPAAN MUNCUL SETELAH SUCCESS LOGIN */
         tampilkanSapaanRole();
     }
 };
@@ -819,8 +821,8 @@ async function checkLogin() {
         initRealtimeSessionListener(userEmail);
 
         generateYearOptions(); 
-        renderTabelSiswa();
-        loadTransactions();
+        await renderTabelSiswa();
+        await loadTransactions();
     } else {
         stopHeartbeat();
         document.getElementById("loginPage").style.display = "flex";
@@ -875,9 +877,9 @@ async function loadTransactions() {
         }
 
         transactions = data || [];
-        updateSummary();
+        await updateSummary();
         renderTable();
-        renderRecapTahunan();
+        await renderRecapTahunan();
     } catch {
         showToast("❌ Terjadi kesalahan jaringan");
     }
@@ -956,7 +958,7 @@ window.deleteTransaction = async function (id) {
 };
 
 /* PERHITUNGAN RINGKASAN SALDO */
-function updateSummary() {
+async function updateSummary() {
     let masuk = 0, keluar = 0;
     
     transactions.forEach(item => {
@@ -965,9 +967,10 @@ function updateSummary() {
     });
 
     let totalKasChecklist = 0;
-    let dataSiswa = getDataSiswa();
+    let dataSiswa = await getDataSiswa();
     dataSiswa.forEach(siswa => {
-        const jumlahBulanLunas = siswa.bulan.filter(b => b === true).length;
+        const bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : [];
+        const jumlahBulanLunas = bulanArr.filter(b => b === true).length;
         totalKasChecklist += jumlahBulanLunas * NOMINAL_KAS_PER_BULAN;
     });
 
