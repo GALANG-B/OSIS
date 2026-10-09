@@ -15,6 +15,7 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let transactions = [];
 let heartbeatTimer = null;
 let currentUserRole = 'member';
+let sessionChannel = null;
 
 /* INTEGRASI SWEETALERT2 NOTIFICATION TOAST */
 const Toast = Swal.mixin({
@@ -59,7 +60,7 @@ function tampilkanSapaanRole() {
         Swal.fire({
             icon: 'info',
             title: 'Selamat Datang! 👋',
-            html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas. (RAUSAH MACEM–MACEM) ',
+            html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas.',
             confirmButtonColor: '#2563eb',
             confirmButtonText: 'Lihat Laporan',
             background: '#0f172a',
@@ -597,29 +598,34 @@ function isLockedOut() {
         const errorElement = document.getElementById("loginError");
         const loginBtn = document.getElementById("loginSubmitBtn");
 
-        errorElement.innerHTML = `⏳ Terlalu banyak percobaan gagal.<br>Silakan tunggu <b>${remainingSeconds}</b> detik lagi.`;
-        errorElement.style.display = "block";
-        loginBtn.disabled = true;
+        if (errorElement) {
+            errorElement.innerHTML = `⏳ Terlalu banyak percobaan gagal.<br>Silakan tunggu <b>${remainingSeconds}</b> detik lagi.`;
+            errorElement.style.display = "block";
+        }
+        if (loginBtn) loginBtn.disabled = true;
         return true;
     } else {
         if (lockoutUntil !== 0) {
             localStorage.removeItem("lockoutUntil");
             localStorage.setItem("failedAttempts", "0");
-            document.getElementById("loginSubmitBtn").disabled = false;
-            document.getElementById("loginError").style.display = "none";
+            const loginBtn = document.getElementById("loginSubmitBtn");
+            const errorElement = document.getElementById("loginError");
+            if (loginBtn) loginBtn.disabled = false;
+            if (errorElement) errorElement.style.display = "none";
         }
         return false;
     }
 }
 
 setInterval(() => {
-    if (document.getElementById("loginPage").style.display !== "none") {
+    const loginPage = document.getElementById("loginPage");
+    if (loginPage && loginPage.style.display !== "none") {
         isLockedOut();
     }
 }, 1000);
 
-/* SINGLE SESSION LOCK */
-async function checkActiveSessionLock(currentEmail) {
+/* SINGLE SESSION LOCK (DENGAN PRIORITAS OPERATOR & KICK MEMBER) */
+async function checkActiveSessionLock(currentEmail, currentRole) {
     try {
         const { data, error } = await supabaseClient
             .from("session_lock")
@@ -633,7 +639,13 @@ async function checkActiveSessionLock(currentEmail) {
         const now = Date.now();
         const secondsDiff = (now - lastPing) / 1000;
 
+        // Jika ada sesi lain yang masih aktif dalam 30 detik terakhir
         if (secondsDiff < 30 && data.user_email && data.user_email !== currentEmail) {
+            // OPERATOR KICK MEMBER: Jika yang masuk Operator dan yang aktif Member
+            if (currentRole === 'operator' && data.user_role === 'member') {
+                return { locked: false, isKickingMember: true };
+            }
+            // MEMBER DITOLAK: Jika yang aktif user lain (Operator / Member lain)
             return { locked: true, activeUser: data.user_email };
         }
 
@@ -643,21 +655,22 @@ async function checkActiveSessionLock(currentEmail) {
     }
 }
 
-async function sendHeartbeat(email) {
+async function sendHeartbeat(email, role) {
     try {
         await supabaseClient.from("session_lock").upsert({
             id: 1,
             user_email: email,
+            user_role: role || currentUserRole,
             last_ping: new Date().toISOString()
         });
     } catch (e) {}
 }
 
-function startHeartbeat(email) {
+function startHeartbeat(email, role) {
     stopHeartbeat();
-    sendHeartbeat(email);
+    sendHeartbeat(email, role);
     heartbeatTimer = setInterval(() => {
-        sendHeartbeat(email);
+        sendHeartbeat(email, role);
     }, 10000);
 }
 
@@ -668,7 +681,39 @@ function stopHeartbeat() {
     }
 }
 
-/* PROSES LOGIN DENGAN SAPAAN ROLE */
+/* REALTIME DETECTOR UNTUK TENDANG MEMBER KETIKA OPERATOR MASUK */
+function initRealtimeSessionListener(myEmail) {
+    if (sessionChannel) {
+        supabaseClient.removeChannel(sessionChannel);
+    }
+
+    sessionChannel = supabaseClient
+        .channel('session_lock_tracker')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'session_lock' }, async (payload) => {
+            // Hanya berlaku untuk akun bertipe Member
+            if (currentUserRole === 'member') {
+                const newLock = payload.new;
+                // Jika gembok sesi berubah ke email lain (Operator masuk)
+                if (newLock && newLock.user_email && newLock.user_email !== myEmail) {
+                    stopHeartbeat();
+                    await supabaseClient.auth.signOut();
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Sesi Dialihkan ⚠️',
+                        text: 'Sesi kamu diakhiri secara otomatis karena Operator telah masuk.',
+                        confirmButtonColor: '#ef4444',
+                        background: '#0f172a',
+                        color: '#ffffff'
+                    }).then(() => {
+                        location.reload();
+                    });
+                }
+            }
+        })
+        .subscribe();
+}
+
+/* PROSES LOGIN DENGAN PRIORITAS ROLE OPERATOR */
 window.login = async function () {
     if (isLockedOut()) return;
 
@@ -682,13 +727,7 @@ window.login = async function () {
         return;
     }
 
-    const lockStatus = await checkActiveSessionLock(emailInput);
-    if (lockStatus.locked) {
-        errorElement.innerHTML = `🚫 Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di sistem.<br>Silakan tunggu pengguna tersebut logout!`;
-        errorElement.style.display = "block";
-        return;
-    }
-
+    // 1. Verifikasi Email & Password ke Supabase Auth
     const { data, error } = await supabaseClient.auth.signInWithPassword({
         email: emailInput,
         password: passwordInput
@@ -708,6 +747,19 @@ window.login = async function () {
             errorElement.style.display = "block";
         }
     } else {
+        // 2. Ambil Role Pengguna Terlebih Dahulu
+        await checkUserRole(data.user.email);
+
+        // 3. Cek Proteksi Sesi Aktif dengan Hak Akses Role
+        const lockStatus = await checkActiveSessionLock(data.user.email, currentUserRole);
+        if (lockStatus.locked) {
+            await supabaseClient.auth.signOut();
+            errorElement.innerHTML = `🚫 Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di sistem.<br>Silakan tunggu pengguna tersebut logout!`;
+            errorElement.style.display = "block";
+            return;
+        }
+
+        // Login Berhasil -> Reset Status
         localStorage.removeItem("failedAttempts");
         localStorage.removeItem("lockoutUntil");
         errorElement.style.display = "none";
@@ -717,7 +769,8 @@ window.login = async function () {
             await supabaseClient.from("log_login").insert([{ email: data.user.email }]);
         } catch (err) {}
 
-        startHeartbeat(data.user.email);
+        startHeartbeat(data.user.email, currentUserRole);
+        initRealtimeSessionListener(data.user.email);
         await checkLogin();
         
         /* POP-UP SAPAAN MUNCUL SETELAH SUCCESS LOGIN */
@@ -736,21 +789,25 @@ window.logout = async function () {
     location.reload();
 };
 
-/* PENGECEKAN SESI AKTIF */
+/* PENGECEKAN SESI AKTIF SAAT REFRESH HALAMAN */
 async function checkLogin() {
     const { data: { session } } = await supabaseClient.auth.getSession();
 
     if (session) {
         const userEmail = session.user.email;
-        
-        const lockStatus = await checkActiveSessionLock(userEmail);
+        await checkUserRole(userEmail);
+
+        const lockStatus = await checkActiveSessionLock(userEmail, currentUserRole);
         if (lockStatus.locked) {
+            stopHeartbeat();
             await supabaseClient.auth.signOut();
             document.getElementById("loginPage").style.display = "flex";
             document.getElementById("dashboard").style.display = "none";
             const errorElement = document.getElementById("loginError");
-            errorElement.innerHTML = `🚫 Sesi dialihkan. Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di perangkat lain.`;
-            errorElement.style.display = "block";
+            if (errorElement) {
+                errorElement.innerHTML = `🚫 Sesi dialihkan. Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di perangkat lain.`;
+                errorElement.style.display = "block";
+            }
             return;
         }
 
@@ -758,9 +815,9 @@ async function checkLogin() {
         document.getElementById("dashboard").style.display = "block";
         document.getElementById("currentUserDisplay").textContent = `Pengguna: ${userEmail}`;
 
-        await checkUserRole(userEmail);
+        startHeartbeat(userEmail, currentUserRole);
+        initRealtimeSessionListener(userEmail);
 
-        startHeartbeat(userEmail);
         generateYearOptions(); 
         renderTabelSiswa();
         loadTransactions();
@@ -772,9 +829,12 @@ async function checkLogin() {
     }
 }
 
-document.getElementById("password").addEventListener("keydown", function (e) {
-    if (e.key === "Enter") window.login();
-});
+const passwordInputEl = document.getElementById("password");
+if (passwordInputEl) {
+    passwordInputEl.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") window.login();
+    });
+}
 
 /* UTILS */
 function rupiah(number) {
