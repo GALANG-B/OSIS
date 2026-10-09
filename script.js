@@ -51,6 +51,55 @@ function showToast(message) {
     });
 }
 
+/* FUNGSI FITUR AUDIT LOG */
+async function logAuditAction(action, details = '') {
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const email = session?.user?.email || 'System';
+        
+        await supabaseClient.from('audit_logs').insert([{
+            user_email: email,
+            user_role: currentUserRole,
+            action: action,
+            details: details
+        }]);
+        
+        await loadAuditLogs();
+    } catch (err) {
+        console.error('Gagal mencatat audit log:', err);
+    }
+}
+
+async function loadAuditLogs() {
+    const tbody = document.getElementById('bodyTabelAudit');
+    if (!tbody) return;
+
+    const { data: logs, error } = await supabaseClient
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    if (error || !logs || logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#888;padding:15px;">Belum ada riwayat aktivitas.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = '';
+    logs.forEach(log => {
+        const tr = document.createElement('tr');
+        const waktu = new Date(log.created_at).toLocaleString('id-ID');
+        tr.innerHTML = `
+            <td style="font-size:12px; color:#cbd5e1;">${waktu}</td>
+            <td><b>${escapeHTML(log.user_email)}</b></td>
+            <td><span style="font-size:11px; padding:2px 6px; border-radius:4px; background:#334155; color:#f8fafc;">${log.user_role.toUpperCase()}</span></td>
+            <td><b style="color:#38bdf8;">${escapeHTML(log.action)}</b></td>
+            <td style="font-size:13px;">${escapeHTML(log.details)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
 /* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
 function tampilkanSapaanRole() {
     if (currentUserRole === 'admin') {
@@ -245,20 +294,21 @@ async function toggleBayar(idSiswa, indexBulan) {
         return;
     }
     
-    const { data: siswa } = await supabaseClient.from('siswa').select('bulan').eq('id', idSiswa).single();
+    const { data: siswa } = await supabaseClient.from('siswa').select('nama, bulan').eq('id', idSiswa).single();
     if (!siswa) return;
 
     let bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
     bulanArr[indexBulan] = !bulanArr[indexBulan];
 
     await supabaseClient.from('siswa').update({ bulan: bulanArr }).eq('id', idSiswa);
+    await logAuditAction('UBAH_KAS_SISWA', `Mengubah status kas siswa ${siswa.nama} (Bulan ke-${indexBulan + 1})`);
     await renderTabelSiswa();
 }
 
 async function lunasSemuaBulan(idSiswa) {
     if (currentUserRole !== 'admin' && currentUserRole !== 'operator') return;
 
-    const { data: siswa } = await supabaseClient.from('siswa').select('bulan').eq('id', idSiswa).single();
+    const { data: siswa } = await supabaseClient.from('siswa').select('nama, bulan').eq('id', idSiswa).single();
     if (!siswa) return;
 
     let bulanArr = Array.isArray(siswa.bulan) ? siswa.bulan : new Array(12).fill(false);
@@ -266,6 +316,7 @@ async function lunasSemuaBulan(idSiswa) {
     const newBulanArr = new Array(12).fill(!isAllChecked);
 
     await supabaseClient.from('siswa').update({ bulan: newBulanArr }).eq('id', idSiswa);
+    await logAuditAction('UBAH_KAS_SISWA', `Mengubah status lunas 1 th siswa ${siswa.nama}`);
     await renderTabelSiswa();
     showToast(`✅ Status pembayaran diperbarui!`);
 }
@@ -291,6 +342,7 @@ async function tambahSiswa() {
             return;
         }
 
+        await logAuditAction('TAMBAH_SISWA', `Menambahkan siswa: ${nama} (Kelas ${kelas})`);
         input.value = '';
         await renderTabelSiswa();
         showToast(`✅ Siswa ${nama} berhasil ditambahkan!`);
@@ -314,6 +366,7 @@ async function hapusSiswa(idSiswa, namaSiswa) {
     }).then(async (result) => {
         if (result.isConfirmed) {
             await supabaseClient.from('siswa').delete().eq('id', idSiswa);
+            await logAuditAction('HAPUS_SISWA', `Menghapus siswa: ${namaSiswa}`);
             await renderTabelSiswa();
             showToast("🗑 Siswa berhasil dihapus");
         }
@@ -405,6 +458,7 @@ window.exportPDF = function () {
     });
 
     doc.save(`Laporan-Kas-Sekolah-${selectedYear}.pdf`);
+    logAuditAction('EKSPOR_PDF', `Mencetak laporan PDF periode ${selectedYear}`);
     showToast("✅ Berhasil mengunduh Laporan PDF!");
 };
 
@@ -671,17 +725,14 @@ async function checkActiveSessionLock(currentEmail, currentRole) {
         const now = Date.now();
         const secondsDiff = (now - lastPing) / 1000;
 
-        // Jika ada pengguna aktif dalam 30 detik terakhir
         if (secondsDiff < 30 && data.user_email && data.user_email !== currentEmail) {
             const myPriority = ROLE_PRIORITY[currentRole] || 1;
             const activePriority = ROLE_PRIORITY[data.user_role] || 1;
 
-            // Jika prioritas KITA LEBIH TINGGI -> Tendang pengguna aktif lama (misal Admin tendang Operator B/Member, atau Operator B tendang Member)
             if (myPriority > activePriority) {
                 return { locked: false, isKicking: true };
             }
 
-            // Jika prioritas SAMA ATAU LEBIH RENDAH -> Ditolak (misal Operator B tidak bisa tendang Admin/Operator A)
             return { locked: true, activeUser: data.user_email, activeRole: data.user_role };
         }
 
@@ -731,7 +782,6 @@ function initRealtimeSessionListener(myEmail) {
                 const activePriority = ROLE_PRIORITY[newLock.user_role] || 1;
                 const myPriority = ROLE_PRIORITY[currentUserRole] || 1;
 
-                // Jika user yang baru masuk memiliki hirarki LEBIH TINGGI dari kita, kita ditendang otomatis!
                 if (activePriority > myPriority) {
                     stopHeartbeat();
                     await supabaseClient.auth.signOut();
@@ -792,6 +842,7 @@ window.login = async function () {
         const lockStatus = await checkActiveSessionLock(data.user.email, currentUserRole);
         if (lockStatus.locked) {
             await supabaseClient.auth.signOut();
+            await logAuditAction('SESI_DITOLAK', `Ditolak masuk karena ${lockStatus.activeUser} (${lockStatus.activeRole}) aktif`);
             errorElement.innerHTML = `🚫 Sistem sedang digunakan oleh <b>${escapeHTML(lockStatus.activeUser)}</b> (${(lockStatus.activeRole || '').toUpperCase()}).<br>Kamu tidak dapat mengambil alih sesi pengguna tingkat di atasmu!`;
             errorElement.style.display = "block";
             return;
@@ -808,6 +859,7 @@ window.login = async function () {
 
         startHeartbeat(data.user.email, currentUserRole);
         initRealtimeSessionListener(data.user.email);
+        await logAuditAction('LOGIN', 'Berhasil masuk ke sistem');
         await checkLogin();
         
         tampilkanSapaanRole();
@@ -816,6 +868,7 @@ window.login = async function () {
 
 /* PROSES LOGOUT */
 window.logout = async function () {
+    await logAuditAction('LOGOUT', 'Keluar dari sistem');
     stopHeartbeat();
     try {
         await supabaseClient.from("session_lock").delete().eq("id", 1);
@@ -857,6 +910,7 @@ async function checkLogin() {
         generateYearOptions(); 
         await renderTabelSiswa();
         await loadTransactions();
+        await loadAuditLogs();
     } else {
         stopHeartbeat();
         document.getElementById("loginPage").style.display = "flex";
@@ -949,6 +1003,7 @@ if (transForm) {
                 showToast("❌ Gagal menyimpan data");
                 return;
             }
+            await logAuditAction('TAMBAH_TRANSAKSI', `${transaksi.jenis}: ${rupiah(transaksi.jumlah)} (${transaksi.kategori})`);
             showToast("✅ Transaksi berhasil dicatat!");
             this.reset();
             document.getElementById("tanggal").value = getToday();
@@ -982,6 +1037,7 @@ window.deleteTransaction = async function (id) {
                     showToast("❌ Gagal menghapus transaksi");
                     return;
                 }
+                await logAuditAction('HAPUS_TRANSAKSI', `Menghapus transaksi ID: ${id}`);
                 showToast("🗑 Transaksi berhasil dihapus");
                 await loadTransactions();
             } catch {
@@ -1114,6 +1170,7 @@ window.exportCSV = function () {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    logAuditAction('EKSPOR_CSV', 'Mengekspor laporan kas ke format CSV');
 };
 
 /* MENJALANKAN PENGECEKAN SESI AWAL */
