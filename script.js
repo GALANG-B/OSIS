@@ -12,6 +12,13 @@ const SUPABASE_URL = "https://mdcegfhpkvrikxvbwxqu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ReqDYL_GZugxAXb5ylavNw_l4p4MX4O";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+/* HIERARKI PRIORITAS LOGIN (SESSION LOCK) */
+const ROLE_PRIORITY = {
+    'admin': 3,     // Operator A (Prioritas Tertinggi)
+    'operator': 2,  // Operator B (Menengah - Bisa tendang Member, tidak bisa tendang Admin)
+    'member': 1     // Member (Terendah - Tidak bisa tendang siapa pun)
+};
+
 let transactions = [];
 let heartbeatTimer = null;
 let currentUserRole = 'member';
@@ -46,11 +53,21 @@ function showToast(message) {
 
 /* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
 function tampilkanSapaanRole() {
-    if (currentUserRole === 'operator') {
+    if (currentUserRole === 'admin') {
         Swal.fire({
             icon: 'success',
-            title: 'Halo, Operator! 🛠️',
-            html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola, menambah, dan menghapus data kas.',
+            title: 'Halo, Operator Utama (Admin)! 👑',
+            html: 'Selamat bekerja! Kamu punya <b>akses tertinggi</b> untuk mengelola kas dan mengambil alih sesi.',
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'Mulai Kelola Kas',
+            background: '#0f172a',
+            color: '#ffffff'
+        });
+    } else if (currentUserRole === 'operator') {
+        Swal.fire({
+            icon: 'success',
+            title: 'Halo, Operator B! 🛠️',
+            html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola kas. (Akan menunggu jika Operator A sedang aktif).',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
             background: '#0f172a',
@@ -95,7 +112,7 @@ async function checkUserRole(email) {
             .maybeSingle();
 
         if (data && data.role) {
-            currentUserRole = data.role;
+            currentUserRole = data.role.toLowerCase();
         } else {
             currentUserRole = 'member';
         }
@@ -109,15 +126,19 @@ async function checkUserRole(email) {
 /* MENERAPKAN HAK AKSES UI BERDASARKAN ROLE */
 function terapkanHakAksesUI() {
     const roleBadge = document.getElementById('userRoleBadge');
+    const isOperator = (currentUserRole === 'admin' || currentUserRole === 'operator');
+
     if (roleBadge) {
         roleBadge.textContent = currentUserRole.toUpperCase();
-        roleBadge.style.background = currentUserRole === 'operator' ? '#059669' : '#d97706';
+        if (currentUserRole === 'admin') roleBadge.style.background = '#8b5cf6';
+        else if (currentUserRole === 'operator') roleBadge.style.background = '#059669';
+        else roleBadge.style.background = '#d97706';
     }
 
     const sectionTambahSiswa = document.getElementById('sectionTambahSiswaContainer');
     const sectionTambahTransaksi = document.getElementById('sectionTambahTransaksi');
 
-    if (currentUserRole === 'member') {
+    if (!isOperator) {
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'none';
         if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'none';
     } else {
@@ -156,8 +177,10 @@ async function renderTabelSiswa() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
+    const isOperator = (currentUserRole === 'admin' || currentUserRole === 'operator');
+
     if (thAksiSiswa) {
-        thAksiSiswa.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
+        thAksiSiswa.style.display = isOperator ? 'table-cell' : 'none';
     }
 
     let dataSiswa = await getDataSiswa();
@@ -181,7 +204,7 @@ async function renderTabelSiswa() {
 
             let htmlCheckbox = '';
             bulanArr.forEach((lunas, indexBulan) => {
-                const disabledAttr = currentUserRole === 'member' ? 'disabled' : '';
+                const disabledAttr = !isOperator ? 'disabled' : '';
                 htmlCheckbox += `
                     <td style="text-align: center;">
                         <input type="checkbox" style="width: 18px; height: 18px; accent-color: #10b981; cursor: pointer;" ${lunas ? 'checked' : ''} ${disabledAttr} onchange="toggleBayar('${siswa.id}', ${indexBulan})">
@@ -190,7 +213,7 @@ async function renderTabelSiswa() {
             });
 
             let htmlAksi = '';
-            if (currentUserRole === 'operator') {
+            if (isOperator) {
                 htmlAksi = `
                     <td style="text-align: center; white-space: nowrap;">
                         <button class="refresh-btn" style="padding: 4px 8px; font-size: 11px; margin-right: 4px; background: #2563eb;" onclick="kirimNotifWA('${siswa.id}')" title="Kirim Tagihan WA">💬 WA</button>
@@ -216,7 +239,7 @@ async function renderTabelSiswa() {
 }
 
 async function toggleBayar(idSiswa, indexBulan) {
-    if (currentUserRole !== 'operator') {
+    if (currentUserRole !== 'admin' && currentUserRole !== 'operator') {
         showToast("⚠️ Anda tidak memiliki izin mengubah data!");
         await renderTabelSiswa();
         return;
@@ -233,7 +256,7 @@ async function toggleBayar(idSiswa, indexBulan) {
 }
 
 async function lunasSemuaBulan(idSiswa) {
-    if (currentUserRole !== 'operator') return;
+    if (currentUserRole !== 'admin' && currentUserRole !== 'operator') return;
 
     const { data: siswa } = await supabaseClient.from('siswa').select('bulan').eq('id', idSiswa).single();
     if (!siswa) return;
@@ -248,7 +271,7 @@ async function lunasSemuaBulan(idSiswa) {
 }
 
 async function tambahSiswa() {
-    if (currentUserRole !== 'operator') return;
+    if (currentUserRole !== 'admin' && currentUserRole !== 'operator') return;
     const input = document.getElementById('inputNamaSiswa');
     const selectKelas = document.getElementById('selectKelasSiswa');
     const nama = input.value.trim();
@@ -277,7 +300,7 @@ async function tambahSiswa() {
 }
 
 async function hapusSiswa(idSiswa, namaSiswa) {
-    if (currentUserRole !== 'operator') return;
+    if (currentUserRole !== 'admin' && currentUserRole !== 'operator') return;
     
     Swal.fire({
         title: 'Hapus Siswa?',
@@ -633,7 +656,7 @@ setInterval(() => {
     }
 }, 1000);
 
-/* SINGLE SESSION LOCK (DENGAN PRIORITAS OPERATOR & KICK MEMBER) */
+/* SINGLE SESSION LOCK BERBASIS HIERARKI PERAN */
 async function checkActiveSessionLock(currentEmail, currentRole) {
     try {
         const { data, error } = await supabaseClient
@@ -648,11 +671,18 @@ async function checkActiveSessionLock(currentEmail, currentRole) {
         const now = Date.now();
         const secondsDiff = (now - lastPing) / 1000;
 
+        // Jika ada pengguna aktif dalam 30 detik terakhir
         if (secondsDiff < 30 && data.user_email && data.user_email !== currentEmail) {
-            if (currentRole === 'operator' && data.user_role === 'member') {
-                return { locked: false, isKickingMember: true };
+            const myPriority = ROLE_PRIORITY[currentRole] || 1;
+            const activePriority = ROLE_PRIORITY[data.user_role] || 1;
+
+            // Jika prioritas KITA LEBIH TINGGI -> Tendang pengguna aktif lama (misal Admin tendang Operator B/Member, atau Operator B tendang Member)
+            if (myPriority > activePriority) {
+                return { locked: false, isKicking: true };
             }
-            return { locked: true, activeUser: data.user_email };
+
+            // Jika prioritas SAMA ATAU LEBIH RENDAH -> Ditolak (misal Operator B tidak bisa tendang Admin/Operator A)
+            return { locked: true, activeUser: data.user_email, activeRole: data.user_role };
         }
 
         return { locked: false };
@@ -696,15 +726,19 @@ function initRealtimeSessionListener(myEmail) {
     sessionChannel = supabaseClient
         .channel('session_lock_tracker')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'session_lock' }, async (payload) => {
-            if (currentUserRole === 'member') {
-                const newLock = payload.new;
-                if (newLock && newLock.user_email && newLock.user_email !== myEmail) {
+            const newLock = payload.new;
+            if (newLock && newLock.user_email && newLock.user_email !== myEmail) {
+                const activePriority = ROLE_PRIORITY[newLock.user_role] || 1;
+                const myPriority = ROLE_PRIORITY[currentUserRole] || 1;
+
+                // Jika user yang baru masuk memiliki hirarki LEBIH TINGGI dari kita, kita ditendang otomatis!
+                if (activePriority > myPriority) {
                     stopHeartbeat();
                     await supabaseClient.auth.signOut();
                     Swal.fire({
                         icon: 'warning',
                         title: 'Sesi Dialihkan ⚠️',
-                        text: 'Sesi kamu diakhiri secara otomatis karena Operator telah masuk.',
+                        text: `Sesi kamu diakhiri secara otomatis karena pengguna dengan hirarki lebih tinggi (${newLock.user_email}) telah masuk.`,
                         confirmButtonColor: '#ef4444',
                         background: '#0f172a',
                         color: '#ffffff'
@@ -720,7 +754,7 @@ function initRealtimeSessionListener(myEmail) {
         .subscribe();
 }
 
-/* PROSES LOGIN DENGAN PRIORITAS ROLE OPERATOR */
+/* PROSES LOGIN DENGAN PRIORITAS ROLE HIERARKI */
 window.login = async function () {
     if (isLockedOut()) return;
 
@@ -758,7 +792,7 @@ window.login = async function () {
         const lockStatus = await checkActiveSessionLock(data.user.email, currentUserRole);
         if (lockStatus.locked) {
             await supabaseClient.auth.signOut();
-            errorElement.innerHTML = `🚫 Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di sistem.<br>Silakan tunggu pengguna tersebut logout!`;
+            errorElement.innerHTML = `🚫 Sistem sedang digunakan oleh <b>${escapeHTML(lockStatus.activeUser)}</b> (${(lockStatus.activeRole || '').toUpperCase()}).<br>Kamu tidak dapat mengambil alih sesi pengguna tingkat di atasmu!`;
             errorElement.style.display = "block";
             return;
         }
@@ -807,7 +841,7 @@ async function checkLogin() {
             document.getElementById("dashboard").style.display = "none";
             const errorElement = document.getElementById("loginError");
             if (errorElement) {
-                errorElement.innerHTML = `🚫 Sesi dialihkan. Pengguna <b>${escapeHTML(lockStatus.activeUser)}</b> sedang aktif di perangkat lain.`;
+                errorElement.innerHTML = `🚫 Sesi dialihkan. Sistem sedang aktif digunakan oleh <b>${escapeHTML(lockStatus.activeUser)}</b>.`;
                 errorElement.style.display = "block";
             }
             return;
@@ -889,8 +923,8 @@ const transForm = document.getElementById("transactionForm");
 if (transForm) {
     transForm.addEventListener("submit", async function (e) {
         e.preventDefault();
-        if (currentUserRole !== 'operator') {
-            showToast("⚠️ Akses ditolak! Hanya operator yang dapat menambah transaksi.");
+        if (currentUserRole !== 'admin' && currentUserRole !== 'operator') {
+            showToast("⚠️ Akses ditolak! Hanya operator/admin yang dapat menambah transaksi.");
             return;
         }
 
@@ -926,8 +960,8 @@ if (transForm) {
 }
 
 window.deleteTransaction = async function (id) {
-    if (currentUserRole !== 'operator') {
-        showToast("⚠️ Akses ditolak! Hanya operator yang dapat menghapus transaksi.");
+    if (currentUserRole !== 'admin' && currentUserRole !== 'operator') {
+        showToast("⚠️ Akses ditolak! Hanya operator/admin yang dapat menghapus transaksi.");
         return;
     }
     
@@ -1005,8 +1039,10 @@ function renderTable() {
     const thAksiRiwayat = document.getElementById("thAksiRiwayat");
     if (!tbody) return;
 
+    const isOperator = (currentUserRole === 'admin' || currentUserRole === 'operator');
+
     if (thAksiRiwayat) {
-        thAksiRiwayat.style.display = currentUserRole === 'operator' ? 'table-cell' : 'none';
+        thAksiRiwayat.style.display = isOperator ? 'table-cell' : 'none';
     }
 
     const data = getFilteredData();
@@ -1020,7 +1056,7 @@ function renderTable() {
     data.forEach(item => {
         const tr = document.createElement("tr");
         let htmlAksi = '';
-        if (currentUserRole === 'operator') {
+        if (isOperator) {
             htmlAksi = `<td><button class="delete-btn" onclick="deleteTransaction('${item.id}')">Hapus</button></td>`;
         }
 
