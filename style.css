@@ -1,16 +1,33 @@
 /* =========================
-   DASAR & VARIABEL WARNA (TEMA HIJAU EMERALD & GOLD)
+   DASAR & VARIABEL WARNA (TEMA MULTI-MODE)
 ========================= */
 :root {
     --bg-dark: #061811;
-    --card-bg: rgba(15, 41, 30, 0.75);
-    --border-glow: rgba(16, 185, 129, 0.25);
+    --card-bg: #0f291e;
+    --card-border: #1e3a2b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --input-bg: #061811;
+    --table-bg: #061811;
+    --table-th-bg: #0f291e;
+    --login-box-bg: rgba(15, 23, 42, 0.85);
     --accent-emerald: #059669;
     --accent-green: #10b981;
     --accent-mint: #34d399;
     --accent-gold: #f59e0b;
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
+}
+
+/* TEMA TERANG (LIGHT MODE) */
+[data-theme="light"] {
+    --bg-dark: #f1f5f9;
+    --card-bg: #ffffff;
+    --card-border: #cbd5e1;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --input-bg: #f8fafc;
+    --table-bg: #ffffff;
+    --table-th-bg: #e2e8f0;
+    --login-box-bg: rgba(255, 255, 255, 0.95);
 }
 
 * {
@@ -25,6 +42,7 @@ body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
     overflow-x: hidden;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Background Ambient Lighting Effect */
@@ -63,8 +81,8 @@ body {
 }
 
 @keyframes pulseBorder {
-    0%, 100% { border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 20px 50px rgba(0,0,0,0.6), 0 0 20px rgba(16, 185, 129, 0.15); }
-    50% { border-color: rgba(5, 150, 105, 0.5); box-shadow: 0 20px 50px rgba(0,0,0,0.7), 0 0 30px rgba(16, 185, 129, 0.25); }
+    0%, 100% { border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 20px 50px rgba(0,0,0,0.2), 0 0 20px rgba(16, 185, 129, 0.15); }
+    50% { border-color: rgba(5, 150, 105, 0.5); box-shadow: 0 20px 50px rgba(0,0,0,0.3), 0 0 30px rgba(16, 185, 129, 0.25); }
 }
 
 @keyframes slideToast {
@@ -86,14 +104,15 @@ body {
 .login-box {
     width: 100%;
     max-width: 420px;
-    background: rgba(15, 23, 42, 0.85);
+    background: var(--login-box-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     padding: 36px 28px;
     border-radius: 28px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--card-border);
     text-align: center;
     animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards, pulseBorder 5s infinite ease-in-out;
+    transition: background-color 0.3s ease;
 }
 
 /* Clock Badge Login */
@@ -102,19 +121,18 @@ body {
     align-items: center;
     justify-content: center;
     gap: 8px;
-    background: rgba(6, 78, 59, 0.4);
+    background: rgba(6, 78, 59, 0.15);
     border: 1px solid rgba(16, 185, 129, 0.3);
-    color: var(--accent-mint);
+    color: var(--accent-emerald);
     padding: 8px 18px;
     border-radius: 50px;
     font-size: 13px;
     font-weight: 600;
     margin-bottom: 24px;
-    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
 }
 
 .login-clock-badge .clock-divider {
-    color: rgba(255,255,255,0.2);
+    color: rgba(0,0,0,0.2);
 }
 
 /* Logo Box */
@@ -147,9 +165,7 @@ body {
     font-size: 26px;
     font-weight: 800;
     letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #ffffff 30%, #a7f3d0 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: var(--text-primary);
     margin-bottom: 6px;
 }
 
@@ -169,7 +185,7 @@ body {
 .form-group label {
     display: block;
     margin-bottom: 8px;
-    color: #cbd5e1;
+    color: var(--text-primary);
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -192,11 +208,11 @@ body {
 .form-group input {
     width: 100%;
     padding: 13px 14px 13px 44px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--card-border);
     outline: none;
     border-radius: 14px;
-    background: rgba(15, 23, 42, 0.6);
-    color: white;
+    background: var(--input-bg);
+    color: var(--text-primary);
     font-size: 14px;
     font-family: inherit;
     transition: all 0.25s ease;
@@ -204,7 +220,6 @@ body {
 
 .form-group input:focus {
     border-color: var(--accent-green);
-    background: rgba(15, 23, 42, 0.85);
     box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
 }
 
@@ -353,6 +368,28 @@ header {
     color: #e2e8f0;
 }
 
+/* TOMBOL THEME TOGGLE */
+.theme-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+.theme-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: var(--accent-green);
+}
+
 .logout-btn {
     display: inline-flex;
     align-items: center;
@@ -405,10 +442,10 @@ header {
 }
 
 .card {
-    background: #0f291e;
+    background: var(--card-bg);
     padding: 22px;
     border-radius: 20px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
     transition: all 0.3s ease;
 }
 
@@ -424,7 +461,7 @@ header {
 }
 
 .card h3 {
-    color: #94a3b8;
+    color: var(--text-secondary);
     font-size: 13px;
     font-weight: 600;
 }
@@ -454,20 +491,22 @@ header {
     gap: 8px;
     margin-top: 18px;
     padding: 8px 14px;
-    background: #0f291e;
-    color: #cbd5e1;
+    background: var(--card-bg);
+    color: var(--text-primary);
     border-radius: 12px;
     font-size: 13px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
+    transition: all 0.3s ease;
 }
 
 /* FORM & SECTIONS */
 .section {
     margin-top: 22px;
     padding: 24px;
-    background: #0f291e;
+    background: var(--card-bg);
     border-radius: 20px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
+    transition: all 0.3s ease;
 }
 
 .section h2 {
@@ -485,7 +524,7 @@ header {
 .form-grid label {
     display: block;
     margin-bottom: 6px;
-    color: #cbd5e1;
+    color: var(--text-primary);
     font-size: 13px;
     font-weight: 600;
 }
@@ -493,10 +532,10 @@ header {
 input, select, textarea {
     width: 100%;
     padding: 12px 14px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
     border-radius: 12px;
-    background: #061811;
-    color: white;
+    background: var(--input-bg);
+    color: var(--text-primary);
     outline: none;
     font-size: 14px;
     font-family: inherit;
@@ -544,25 +583,26 @@ input:focus, select:focus, textarea:focus {
 
 .refresh-btn, .export-btn {
     padding: 10px 16px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
     border-radius: 10px;
-    color: white;
-    background: #061811;
+    color: var(--text-primary);
+    background: var(--input-bg);
     cursor: pointer;
     font-weight: 600;
     font-size: 13px;
     font-family: inherit;
+    transition: all 0.2s ease;
 }
 
 .refresh-btn:hover, .export-btn:hover {
     border-color: #10b981;
-    color: #6ee7b7;
+    color: var(--accent-mint);
 }
 
 .table-wrap {
     overflow-x: auto;
     border-radius: 12px;
-    border: 1px solid #1e3a2b;
+    border: 1px solid var(--card-border);
     margin-top: 15px;
 }
 
@@ -570,21 +610,21 @@ table {
     width: 100%;
     border-collapse: collapse;
     min-width: 850px;
-    background: #061811;
+    background: var(--table-bg);
 }
 
 th, td {
     padding: 14px 16px;
-    border-bottom: 1px solid #0f291e;
+    border-bottom: 1px solid var(--card-border);
     text-align: left;
     font-size: 14px;
 }
 
 th {
-    color: #94a3b8;
+    color: var(--text-secondary);
     font-size: 12px;
     text-transform: uppercase;
-    background: #0f291e;
+    background: var(--table-th-bg);
 }
 
 .masuk { color: #4ade80; font-weight: 600; }
@@ -610,8 +650,8 @@ th {
     left: 50%;
     transform: translateX(-50%);
     padding: 14px 24px;
-    background: #0f291e;
-    color: white;
+    background: var(--card-bg);
+    color: var(--text-primary);
     border-radius: 12px;
     border: 1px solid #10b981;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
@@ -623,7 +663,7 @@ th {
 footer {
     padding: 30px;
     text-align: center;
-    color: #64748b;
+    color: var(--text-secondary);
     font-size: 14px;
 }
 
