@@ -80,7 +80,7 @@ function showToast(message) {
     });
 }
 
-/* FUNGSI FITUR AUDIT LOG (DENGAN FORMAT RINGKAS) */
+/* FUNGSI FITUR AUDIT LOG (BERBENTUK CARD LIST) */
 async function logAuditAction(action, details = '') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -100,8 +100,8 @@ async function logAuditAction(action, details = '') {
 }
 
 async function loadAuditLogs() {
-    const tbody = document.getElementById('bodyTabelAudit');
-    if (!tbody) return;
+    const container = document.getElementById('bodyTabelAudit');
+    if (!container) return;
 
     const { data: logs, error } = await supabaseClient
         .from('audit_logs')
@@ -110,32 +110,41 @@ async function loadAuditLogs() {
         .limit(50);
 
     if (error || !logs || logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#888;padding:15px;">Belum ada riwayat aktivitas.</td></tr>`;
+        container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Belum ada riwayat aktivitas.</div>`;
         return;
     }
 
-    tbody.innerHTML = '';
+    container.innerHTML = '';
     logs.forEach(log => {
-        const tr = document.createElement('tr');
-        
         // Format Waktu Disingkat (Jam:Menit - Tgl/Bln)
         const d = new Date(log.created_at);
         const waktuSingkat = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} (${d.getDate()}/${d.getMonth()+1})`;
 
-        // Format Email Disingkat (Membuang domain agar tidak kepanjangan di HP)
+        // Format Email Disingkat
         let displayUser = escapeHTML(log.user_email || '');
         if (displayUser.includes('@')) {
             displayUser = displayUser.split('@')[0];
         }
 
-        tr.innerHTML = `
-            <td style="font-size:11px; white-space:nowrap; color:var(--text-secondary);">${waktuSingkat}</td>
-            <td style="font-weight:700; white-space:nowrap;" title="${escapeHTML(log.user_email)}">${displayUser}</td>
-            <td><span style="font-size:10px; padding:2px 6px; border-radius:4px; background:var(--card-border); color:var(--text-primary);">${log.user_role.toUpperCase()}</span></td>
-            <td><b style="color:#38bdf8;">${escapeHTML(log.action)}</b></td>
-            <td style="font-size:12px;">${escapeHTML(log.details)}</td>
+        const role = (log.user_role || 'member').toUpperCase();
+        let roleBg = '#334155';
+        if (role === 'ADMIN') roleBg = '#8b5cf6';
+        else if (role === 'OPERATOR') roleBg = '#059669';
+
+        const card = document.createElement('div');
+        card.className = 'audit-card-item';
+        card.innerHTML = `
+            <div class="audit-card-header">
+                <span class="audit-time">🕒 ${waktuSingkat}</span>
+                <span class="audit-role" style="background: ${roleBg};">${role}</span>
+            </div>
+            <div class="audit-card-body">
+                <div class="audit-user">👤 <b>${displayUser}</b> <span style="font-size:11px; color:var(--text-secondary);">(${escapeHTML(log.user_email)})</span></div>
+                <div class="audit-action">⚡ <b>${escapeHTML(log.action)}</b></div>
+                <div class="audit-detail">${escapeHTML(log.details || '-')}</div>
+            </div>
         `;
-        tbody.appendChild(tr);
+        container.appendChild(card);
     });
 }
 
