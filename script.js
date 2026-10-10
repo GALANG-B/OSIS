@@ -7,35 +7,6 @@ if ('serviceWorker' in navigator) {
     });
 }
 
-/* LOGIKA FITUR DARK / LIGHT MODE */
-function initTheme() {
-    const savedTheme = localStorage.getItem("theme") || "dark";
-    document.documentElement.setAttribute("data-theme", savedTheme);
-    updateThemeUI(savedTheme);
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute("data-theme") || "dark";
-    const newTheme = currentTheme === "dark" ? "light" : "dark";
-    
-    document.documentElement.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
-    updateThemeUI(newTheme);
-
-    // Refresh grafik agar warna teks dan grid menyesuaikan mode baru
-    renderRecapTahunan();
-}
-
-function updateThemeUI(theme) {
-    const icon = document.getElementById("themeIcon");
-    const text = document.getElementById("themeText");
-    if (icon) icon.textContent = theme === "dark" ? "🌙" : "☀️";
-    if (text) text.textContent = theme === "dark" ? "Dark" : "Light";
-}
-
-// Inisialisasi tema saat file dimuat
-initTheme();
-
 /* CONFIG SUPABASE */
 const SUPABASE_URL = "https://mdcegfhpkvrikxvbwxqu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ReqDYL_GZugxAXb5ylavNw_l4p4MX4O";
@@ -80,7 +51,7 @@ function showToast(message) {
     });
 }
 
-/* FUNGSI FITUR AUDIT LOG */
+/* FUNGSI FITUR AUDIT LOG (DENGAN FORMAT RINGKAS) */
 async function logAuditAction(action, details = '') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -117,13 +88,23 @@ async function loadAuditLogs() {
     tbody.innerHTML = '';
     logs.forEach(log => {
         const tr = document.createElement('tr');
-        const waktu = new Date(log.created_at).toLocaleString('id-ID');
+        
+        // Format Waktu Disingkat (Jam:Menit - Tgl/Bln)
+        const d = new Date(log.created_at);
+        const waktuSingkat = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} (${d.getDate()}/${d.getMonth()+1})`;
+
+        // Format Email Disingkat (Membuang domain @gmail.com agar tidak panjang)
+        let displayUser = escapeHTML(log.user_email || '');
+        if (displayUser.includes('@')) {
+            displayUser = displayUser.split('@')[0];
+        }
+
         tr.innerHTML = `
-            <td style="font-size:12px; color:var(--text-secondary);">${waktu}</td>
-            <td><b>${escapeHTML(log.user_email)}</b></td>
-            <td><span style="font-size:11px; padding:2px 6px; border-radius:4px; background:var(--card-border); color:var(--text-primary);">${log.user_role.toUpperCase()}</span></td>
+            <td style="font-size:11px; white-space:nowrap; color:#cbd5e1;">${waktuSingkat}</td>
+            <td style="font-weight:700; white-space:nowrap;" title="${escapeHTML(log.user_email)}">${displayUser}</td>
+            <td><span style="font-size:10px; padding:2px 6px; border-radius:4px; background:#334155; color:#f8fafc;">${log.user_role.toUpperCase()}</span></td>
             <td><b style="color:#38bdf8;">${escapeHTML(log.action)}</b></td>
-            <td style="font-size:13px;">${escapeHTML(log.details)}</td>
+            <td style="font-size:12px;">${escapeHTML(log.details)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -131,10 +112,6 @@ async function loadAuditLogs() {
 
 /* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
 function tampilkanSapaanRole() {
-    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
-    const bgSwal = isDark ? '#0f172a' : '#ffffff';
-    const textSwal = isDark ? '#ffffff' : '#0f172a';
-
     if (currentUserRole === 'admin') {
         Swal.fire({
             icon: 'success',
@@ -142,8 +119,8 @@ function tampilkanSapaanRole() {
             html: 'Selamat bekerja! Kamu punya <b>akses tertinggi</b> untuk mengelola kas dan mengambil alih sesi.',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
-            background: bgSwal,
-            color: textSwal
+            background: '#0f172a',
+            color: '#ffffff'
         });
     } else if (currentUserRole === 'operator') {
         Swal.fire({
@@ -152,8 +129,8 @@ function tampilkanSapaanRole() {
             html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola kas. (Akan menunggu jika Operator A sedang aktif).',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
-            background: bgSwal,
-            color: textSwal
+            background: '#0f172a',
+            color: '#ffffff'
         });
     } else {
         Swal.fire({
@@ -162,8 +139,8 @@ function tampilkanSapaanRole() {
             html: 'Kamu masuk sebagai <b>Member</b> (Mode Lihat Saja). Kamu dapat melihat seluruh laporan dan grafik rekapitulasi kas.',
             confirmButtonColor: '#2563eb',
             confirmButtonText: 'Lihat Laporan',
-            background: bgSwal,
-            color: textSwal
+            background: '#0f172a',
+            color: '#ffffff'
         });
     }
 }
@@ -387,8 +364,6 @@ async function tambahSiswa() {
 async function hapusSiswa(idSiswa, namaSiswa) {
     if (currentUserRole !== 'admin' && currentUserRole !== 'operator') return;
     
-    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
-
     Swal.fire({
         title: 'Hapus Siswa?',
         text: `Yakin ingin menghapus ${namaSiswa} dari checklist? Data ini tidak dapat dikembalikan.`,
@@ -397,9 +372,7 @@ async function hapusSiswa(idSiswa, namaSiswa) {
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Ya, Hapus!',
-        cancelButtonText: 'Batal',
-        background: isDark ? '#0f172a' : '#ffffff',
-        color: isDark ? '#ffffff' : '#0f172a'
+        cancelButtonText: 'Batal'
     }).then(async (result) => {
         if (result.isConfirmed) {
             await supabaseClient.from('siswa').delete().eq('id', idSiswa);
@@ -576,7 +549,7 @@ async function renderRecapTahunan() {
     renderGrafikKeuangan(namaBulanSingkat, totalMasukGrafik, transaksiKeluarBulan);
 }
 
-/* GRAFIK KEUANGAN (CHART.JS) DENGAN ADVANCED DYNAMIC THEMING */
+/* GRAFIK KEUANGAN (CHART.JS) */
 let myChart = null;
 
 function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
@@ -588,9 +561,6 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
     }
 
     const ctx = canvasElement.getContext('2d');
-    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
-    const textColor = isDark ? '#f1f5f9' : '#0f172a';
-    const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)';
 
     let gradientMasuk = ctx.createLinearGradient(0, 0, 0, 250);
     gradientMasuk.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
@@ -638,7 +608,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
                 legend: {
                     position: 'top',
                     labels: { 
-                        color: textColor, 
+                        color: '#f1f5f9', 
                         font: { family: 'Plus Jakarta Sans', size: 12, weight: '600' },
                         boxWidth: 14,
                         usePointStyle: true
@@ -656,7 +626,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
             scales: {
                 x: {
                     ticks: { 
-                        color: textColor, 
+                        color: '#cbd5e1', 
                         font: { family: 'Plus Jakarta Sans', size: 11 },
                         maxRotation: 0 
                     },
@@ -664,7 +634,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
                 },
                 y: {
                     ticks: { 
-                        color: textColor, 
+                        color: '#cbd5e1', 
                         font: { family: 'Plus Jakarta Sans', size: 10 },
                         callback: function(value) {
                             if (value >= 1000000) {
@@ -675,7 +645,7 @@ function renderGrafikKeuangan(labelsBulan, dataMasuk, dataKeluar) {
                             return value;
                         }
                     },
-                    grid: { color: gridColor }
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' }
                 }
             }
         }
@@ -825,15 +795,13 @@ function initRealtimeSessionListener(myEmail) {
                 if (activePriority > myPriority) {
                     stopHeartbeat();
                     await supabaseClient.auth.signOut();
-                    
-                    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
                     Swal.fire({
                         icon: 'warning',
                         title: 'Sesi Dialihkan ⚠️',
                         text: `Sesi kamu diakhiri secara otomatis karena pengguna dengan hirarki lebih tinggi (${newLock.user_email}) telah masuk.`,
                         confirmButtonColor: '#ef4444',
-                        background: isDark ? '#0f172a' : '#ffffff',
-                        color: isDark ? '#ffffff' : '#0f172a'
+                        background: '#0f172a',
+                        color: '#ffffff'
                     }).then(() => {
                         location.reload();
                     });
@@ -1062,8 +1030,6 @@ window.deleteTransaction = async function (id) {
         return;
     }
     
-    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
-
     Swal.fire({
         title: 'Hapus Transaksi?',
         text: "Data kas yang dihapus dari database tidak dapat dikembalikan!",
@@ -1072,9 +1038,7 @@ window.deleteTransaction = async function (id) {
         confirmButtonColor: '#ef4444',
         cancelButtonColor: '#64748b',
         confirmButtonText: 'Ya, Hapus Transaksi!',
-        cancelButtonText: 'Batal',
-        background: isDark ? '#0f172a' : '#ffffff',
-        color: isDark ? '#ffffff' : '#0f172a'
+        cancelButtonText: 'Batal'
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
