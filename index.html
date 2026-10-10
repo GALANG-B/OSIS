@@ -91,7 +91,7 @@
     </div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- DASHBOARD (DENGAN STICKY HEADER) -->
 <div id="dashboard">
 <header>
     <div class="header-container">
@@ -401,7 +401,7 @@
         </div>
     </div>
 
-    <!-- SEKSI AUDIT LOGS -->
+    <!-- SEKSI AUDIT LOGS (BERBENTUK CARD LIST YANG SIMPEL) -->
     <div class="section" id="sectionAuditLog">
         <h2>📜 Riwayat Aktivitas Sistem (Audit Log)</h2>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Catatan rekam jejak otomatis seluruh aktivitas pengurus di sistem</p>
@@ -412,21 +412,9 @@
             </button>
         </div>
 
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Waktu</th>
-                        <th>Pengguna</th>
-                        <th>Role</th>
-                        <th>Aksi</th>
-                        <th>Detail Aktivitas</th>
-                    </tr>
-                </thead>
-                <tbody id="bodyTabelAudit">
-                    <tr><td colspan="5" style="text-align:center;color:#888;padding:20px;">Memuat riwayat aktivitas...</td></tr>
-                </tbody>
-            </table>
+        <!-- CONTAINER CARD LIST AUDIT LOG -->
+        <div id="bodyTabelAudit" class="audit-cards-container">
+            <div style="text-align:center;color:#888;padding:20px;">Memuat riwayat aktivitas...</div>
         </div>
     </div>
 </div>
