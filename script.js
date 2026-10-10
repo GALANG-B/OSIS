@@ -22,7 +22,6 @@ function toggleTheme() {
     localStorage.setItem("theme", newTheme);
     updateThemeUI(newTheme);
 
-    // Refresh grafik agar warna teks dan grid menyesuaikan mode baru
     renderRecapTahunan();
 }
 
@@ -33,7 +32,6 @@ function updateThemeUI(theme) {
     if (text) text.textContent = theme === "dark" ? "Dark" : "Light";
 }
 
-// Inisialisasi tema saat file dimuat
 initTheme();
 
 /* CONFIG SUPABASE */
@@ -43,15 +41,16 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* HIERARKI PRIORITAS LOGIN (SESSION LOCK) */
 const ROLE_PRIORITY = {
-    'admin': 3,     // Operator A (Prioritas Tertinggi)
-    'operator': 2,  // Operator B (Menengah - Bisa tendang Member, tidak bisa tendang Admin)
-    'member': 1     // Member (Terendah - Tidak bisa tendang siapa pun)
+    'admin': 3,     // Operator A
+    'operator': 2,  // Operator B
+    'member': 1     // Member
 };
 
 let transactions = [];
 let heartbeatTimer = null;
 let currentUserRole = 'member';
 let sessionChannel = null;
+let allAuditLogs = [];
 
 /* INTEGRASI SWEETALERT2 NOTIFICATION TOAST */
 const Toast = Swal.mixin({
@@ -80,7 +79,7 @@ function showToast(message) {
     });
 }
 
-/* FUNGSI FITUR AUDIT LOG (BERBENTUK CARD LIST) */
+/* FUNGSI FITUR AUDIT LOG (DISARING DENGAN ROLE & KALENDER) */
 async function logAuditAction(action, details = '') {
     try {
         const { data: { session } } = await supabaseClient.auth.getSession();
@@ -107,20 +106,33 @@ async function loadAuditLogs() {
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100);
 
     if (error || !logs || logs.length === 0) {
         container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Belum ada riwayat aktivitas.</div>`;
+        allAuditLogs = [];
         return;
     }
 
-    container.innerHTML = '';
-    logs.forEach(log => {
-        // Format Waktu Disingkat (Jam:Menit - Tgl/Bln)
-        const d = new Date(log.created_at);
-        const waktuSingkat = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} (${d.getDate()}/${d.getMonth()+1})`;
+    allAuditLogs = logs;
+    filterAuditLogs();
+}
 
-        // Format Email Disingkat
+function renderAuditLogs(logs) {
+    const container = document.getElementById('bodyTabelAudit');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (logs.length === 0) {
+        container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Tidak ada riwayat aktivitas untuk filter tersebut.</div>`;
+        return;
+    }
+
+    logs.forEach(log => {
+        const d = new Date(log.created_at);
+        const waktuSingkat = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} (${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()})`;
+
         let displayUser = escapeHTML(log.user_email || '');
         if (displayUser.includes('@')) {
             displayUser = displayUser.split('@')[0];
@@ -130,6 +142,7 @@ async function loadAuditLogs() {
         let roleBg = '#334155';
         if (role === 'ADMIN') roleBg = '#8b5cf6';
         else if (role === 'OPERATOR') roleBg = '#059669';
+        else if (role === 'SYSTEM') roleBg = '#475569';
 
         const card = document.createElement('div');
         card.className = 'audit-card-item';
@@ -146,6 +159,37 @@ async function loadAuditLogs() {
         `;
         container.appendChild(card);
     });
+}
+
+function filterAuditLogs() {
+    const roleEl = document.getElementById('filterRoleAudit');
+    const dateEl = document.getElementById('filterTanggalAudit');
+    
+    const selectedRole = roleEl ? roleEl.value.toLowerCase() : '';
+    const selectedDate = dateEl ? dateEl.value : '';
+
+    const filtered = allAuditLogs.filter(log => {
+        const logRole = (log.user_role || '').toLowerCase();
+        const matchRole = !selectedRole || logRole === selectedRole;
+
+        let matchDate = true;
+        if (selectedDate && log.created_at) {
+            const logDateOnly = log.created_at.split('T')[0];
+            matchDate = logDateOnly === selectedDate;
+        }
+
+        return matchRole && matchDate;
+    });
+
+    renderAuditLogs(filtered);
+}
+
+function resetFilterAudit() {
+    const roleEl = document.getElementById('filterRoleAudit');
+    const dateEl = document.getElementById('filterTanggalAudit');
+    if (roleEl) roleEl.value = '';
+    if (dateEl) dateEl.value = '';
+    renderAuditLogs(allAuditLogs);
 }
 
 /* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
