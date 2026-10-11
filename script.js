@@ -261,36 +261,67 @@ async function loadUsersList() {
 
 async function tambahPenggunaBaru() {
     if (currentUserRole !== 'admin') {
-        showToast("⚠️ Hanya Admin yang dapat menambah/mengatur pengguna!");
+        showToast("⚠️ Hanya Admin yang dapat membuat akun baru!");
         return;
     }
 
     const emailInput = document.getElementById('inputEmailUserBaru');
+    const passwordInput = document.getElementById('inputPasswordUserBaru');
     const roleSelect = document.getElementById('selectRoleUserBaru');
-    const email = emailInput.value.trim().toLowerCase();
-    const role = roleSelect.value;
+
+    const email = emailInput ? emailInput.value.trim().toLowerCase() : '';
+    const password = passwordInput ? passwordInput.value : '';
+    const role = roleSelect ? roleSelect.value : 'member';
 
     if (!email || !email.includes('@')) {
         showToast("⚠️ Masukkan email yang valid!");
         return;
     }
 
-    try {
-        const { error } = await supabaseClient
-            .from('profiles')
-            .upsert([{ email: email, role: role }], { onConflict: 'email' });
+    if (!password || password.length < 6) {
+        showToast("⚠️ Password minimal 6 karakter!");
+        return;
+    }
 
-        if (error) {
-            showToast("❌ Gagal menyimpan data pengguna!");
+    try {
+        // Buat instance client sekunder agar sesi Admin yang sedang login tidak terputus/terganti
+        const tempSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: { persistSession: false }
+        });
+
+        // Mendaftarkan akun ke Supabase Auth
+        const { error: authErr } = await tempSupabase.auth.signUp({
+            email: email,
+            password: password
+        });
+
+        if (authErr) {
+            console.error("Auth SignUp Error:", authErr);
+            showToast(`❌ Gagal mendaftarkan akun: ${authErr.message}`);
             return;
         }
 
-        await logAuditAction('TAMBAH_PENGGUNA', `Mengatur role ${email} menjadi ${role}`);
-        showToast(`✅ Pengguna ${email} berhasil diatur sebagai ${role}!`);
-        emailInput.value = '';
+        // Simpan role pengguna ke tabel profiles
+        const { error: profileErr } = await supabaseClient
+            .from('profiles')
+            .upsert([{ email: email, role: role }], { onConflict: 'email' });
+
+        if (profileErr) {
+            console.error("Profiles Upsert Error:", profileErr);
+            showToast("⚠️ Akun Auth terbuat, tapi gagal menyimpan role!");
+        } else {
+            showToast(`✅ Akun ${email} berhasil dibuat sebagai ${role.toUpperCase()}!`);
+        }
+
+        await logAuditAction('BUAT_AKUN_BARU', `Membuat akun baru untuk ${email} (${role})`);
+
+        if (emailInput) emailInput.value = '';
+        if (passwordInput) passwordInput.value = '';
         await loadUsersList();
+
     } catch (e) {
-        showToast("❌ Terjadi kesalahan sistem");
+        console.error("Catch error tambahPenggunaBaru:", e);
+        showToast("❌ Terjadi kesalahan sistem saat membuat akun");
     }
 }
 
@@ -1119,7 +1150,6 @@ function initRealtimeSessionListener(myEmail) {
                     showToast(`🔔 Hak akses (role) kamu diperbarui menjadi: ${currentUserRole.toUpperCase()}`);
                 }
             }
-            // Jika admin, perbarui list user secara realtime
             if (currentUserRole === 'admin') {
                 await loadUsersList();
             }
