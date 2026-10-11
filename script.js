@@ -192,6 +192,151 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA */
+async function loadUsersList() {
+    const tbody = document.getElementById('bodyTabelUsers');
+    if (!tbody) return;
+
+    try {
+        const { data: profiles, error } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .order('email', { ascending: true });
+
+        if (error || !profiles || profiles.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Belum ada data pengguna.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        profiles.forEach(user => {
+            const tr = document.createElement('tr');
+            const role = (user.role || 'member').toLowerCase();
+
+            tr.innerHTML = `
+                <td><b>${escapeHTML(user.email)}</b></td>
+                <td>
+                    <select onchange="ubahRoleUser('${escapeHTML(user.email)}', this.value)" style="padding: 6px 10px; font-size: 12px; width: 130px;">
+                        <option value="member" ${role === 'member' ? 'selected' : ''}>Member</option>
+                        <option value="operator" ${role === 'operator' ? 'selected' : ''}>Operator</option>
+                        <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </td>
+                <td style="text-align: center;">
+                    <button class="delete-btn" onclick="hapusUser('${escapeHTML(user.email)}')">Hapus</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat daftar pengguna.</td></tr>`;
+    }
+}
+
+async function tambahPenggunaBaru() {
+    if (currentUserRole !== 'admin') {
+        showToast("⚠️ Hanya Admin yang dapat menambah/mengatur pengguna!");
+        return;
+    }
+
+    const emailInput = document.getElementById('inputEmailUserBaru');
+    const roleSelect = document.getElementById('selectRoleUserBaru');
+    const email = emailInput.value.trim().toLowerCase();
+    const role = roleSelect.value;
+
+    if (!email || !email.includes('@')) {
+        showToast("⚠️ Masukkan email yang valid!");
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('profiles')
+            .upsert([{ email: email, role: role }], { onConflict: 'email' });
+
+        if (error) {
+            showToast("❌ Gagal menyimpan data pengguna!");
+            return;
+        }
+
+        await logAuditAction('TAMBAH_PENGGUNA', `Mengatur role ${email} menjadi ${role}`);
+        showToast(`✅ Pengguna ${email} berhasil diatur sebagai ${role}!`);
+        emailInput.value = '';
+        await loadUsersList();
+    } catch (e) {
+        showToast("❌ Terjadi kesalahan sistem");
+    }
+}
+
+async function ubahRoleUser(email, newRole) {
+    if (currentUserRole !== 'admin') {
+        showToast("⚠️ Hanya Admin yang dapat mengubah role!");
+        await loadUsersList();
+        return;
+    }
+
+    try {
+        const { error } = await supabaseClient
+            .from('profiles')
+            .update({ role: newRole })
+            .eq('email', email);
+
+        if (error) {
+            showToast("❌ Gagal mengubah role pengguna");
+            await loadUsersList();
+            return;
+        }
+
+        await logAuditAction('UBAH_ROLE_USER', `Mengubah role ${email} menjadi ${newRole}`);
+        showToast(`✅ Role ${email} diubah menjadi ${newRole}`);
+        await loadUsersList();
+    } catch (e) {
+        showToast("❌ Terjadi kesalahan");
+    }
+}
+
+async function hapusUser(email) {
+    if (currentUserRole !== 'admin') {
+        showToast("⚠️ Hanya Admin yang dapat menghapus pengguna!");
+        return;
+    }
+
+    const isDark = document.documentElement.getAttribute("data-theme") !== "light";
+
+    Swal.fire({
+        title: 'Hapus Pengguna?',
+        text: `Yakin ingin menghapus akses untuk ${email}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal',
+        background: isDark ? '#0f172a' : '#ffffff',
+        color: isDark ? '#ffffff' : '#0f172a'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .delete()
+                    .eq('email', email);
+
+                if (error) {
+                    showToast("❌ Gagal menghapus pengguna");
+                    return;
+                }
+
+                await logAuditAction('HAPUS_PENGGUNA', `Menghapus akses pengguna ${email}`);
+                showToast("🗑 Pengguna berhasil dihapus");
+                await loadUsersList();
+            } catch (e) {
+                showToast("❌ Terjadi kesalahan");
+            }
+        }
+    });
+}
+
 /* FUNGSI SAPAAN KHUSUS BERDASARKAN ROLE */
 function tampilkanSapaanRole() {
     const isDark = document.documentElement.getAttribute("data-theme") !== "light";
@@ -202,7 +347,7 @@ function tampilkanSapaanRole() {
         Swal.fire({
             icon: 'success',
             title: 'Halo, Ketua Osis (Admin)! 👑',
-            html: 'Selamat bekerja! Kamu punya <b>akses tertinggi</b> untuk mengelola kas dan mengambil alih sesi.',
+            html: 'Selamat bekerja! Kamu punya <b>akses tertinggi</b> untuk mengelola kas, manajemen pengguna, dan mengambil alih sesi.',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
             background: bgSwal,
@@ -282,6 +427,7 @@ function terapkanHakAksesUI() {
 
     const sectionTambahSiswa = document.getElementById('sectionTambahSiswaContainer');
     const sectionTambahTransaksi = document.getElementById('sectionTambahTransaksi');
+    const sectionAdminPanel = document.getElementById('sectionAdminPanel');
 
     if (!isOperator) {
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'none';
@@ -289,6 +435,13 @@ function terapkanHakAksesUI() {
     } else {
         if (sectionTambahSiswa) sectionTambahSiswa.style.display = 'flex';
         if (sectionTambahTransaksi) sectionTambahTransaksi.style.display = 'block';
+    }
+
+    if (sectionAdminPanel) {
+        sectionAdminPanel.style.display = (currentUserRole === 'admin') ? 'block' : 'none';
+    }
+    if (currentUserRole === 'admin') {
+        loadUsersList();
     }
 }
 
