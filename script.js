@@ -192,62 +192,43 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
-/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (DESAIN KARTU DESKTOP & MOBILE) */
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (HANYA MENGAMBIL DARI TABEL PROFILES) */
 async function loadUsersList() {
     const container = document.getElementById('bodyTabelUsers');
     if (!container) return;
 
     try {
-        // 1. Ambil data profil yang sudah ada
+        // Ambil murni hanya dari tabel profiles
         const { data: profiles, error: errProfiles } = await supabaseClient
             .from('profiles')
-            .select('*');
+            .select('*')
+            .order('email', { ascending: true });
 
         if (errProfiles) {
+            console.error("Gagal load profiles:", errProfiles);
             container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Gagal memuat data pengguna.</div>`;
             return;
         }
 
-        // 2. Ambil seluruh email dari audit logs agar akun terdeteksi otomatis
-        const { data: auditLogs } = await supabaseClient
-            .from('audit_logs')
-            .select('user_email, user_role');
-
-        let userMap = new Map();
-
-        (profiles || []).forEach(p => {
-            if (p.email) {
-                userMap.set(p.email.toLowerCase(), p.role || 'member');
-            }
-        });
-
-        (auditLogs || []).forEach(log => {
-            if (log.user_email && log.user_email !== 'System' && !log.user_email.includes('null')) {
-                const emailClean = log.user_email.toLowerCase();
-                if (!userMap.has(emailClean)) {
-                    const defaultRole = (log.user_role || 'member').toLowerCase();
-                    userMap.set(emailClean, defaultRole);
-                    supabaseClient.from('profiles').insert([{ email: emailClean, role: defaultRole }]);
-                }
-            }
-        });
-
-        if (userMap.size === 0) {
+        if (!profiles || profiles.length === 0) {
             container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Belum ada pengguna terdaftar.</div>`;
             return;
         }
 
         container.innerHTML = '';
-        userMap.forEach((role, email) => {
+        profiles.forEach((p) => {
+            const email = p.email;
+            if (!email) return;
+
             let displayUser = escapeHTML(email);
             if (displayUser.includes('@')) {
                 displayUser = displayUser.split('@')[0];
             }
 
-            const roleClean = (role || 'member').toLowerCase();
-            let roleBg = '#d97706';
-            if (roleClean === 'admin') roleBg = '#8b5cf6';
-            else if (roleClean === 'operator') roleBg = '#059669';
+            const roleClean = (p.role || 'member').toLowerCase();
+            let roleBg = '#d97706'; // Member (Kuning/Cokelat)
+            if (roleClean === 'admin') roleBg = '#8b5cf6'; // Admin (Ungu)
+            else if (roleClean === 'operator') roleBg = '#059669'; // Operator (Hijau)
 
             const card = document.createElement('div');
             card.className = 'user-card-item';
@@ -274,9 +255,11 @@ async function loadUsersList() {
             container.appendChild(card);
         });
     } catch (e) {
+        console.error("Error loadUsersList:", e);
         container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</div>`;
     }
 }
+
 
 
 
