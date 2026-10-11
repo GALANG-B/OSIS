@@ -402,20 +402,20 @@
     </div>
 
     <!-- SEKSI ADMIN PANEL: MANAJEMEN PENGGUNA & HAK AKSES -->
-        <!-- SEKSI ADMIN PANEL: MANAJEMEN PENGGUNA (DESAIN CARD LIST MIRIP AUDIT LOG) -->
     <div class="section" id="sectionAdminPanel" style="display: none;">
         <h2>👥 Manajemen Pengguna & Hak Akses (Admin Panel)</h2>
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Kelola akun pengurus, ubah role (Admin, Operator, Member), atau hapus akses pengguna</p>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Kelola akun pengurus, tambahkan akun baru dengan password, ubah role, atau hapus akses pengguna</p>
 
-        <!-- FORM TAMBAH / SET ROLE -->
+        <!-- FORM TAMBAH PENGGUNA BARU DENGAN PASSWORD -->
         <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; background: rgba(0,0,0,0.1); padding: 12px; border-radius: 12px;">
-            <input type="email" id="inputEmailUserBaru" placeholder="Masukkan email pengguna baru..." style="flex: 2; min-width: 180px;">
-            <select id="selectRoleUserBaru" style="flex: 1; min-width: 120px;">
+            <input type="email" id="inputEmailUserBaru" placeholder="Email pengguna baru..." style="flex: 2; min-width: 160px;">
+            <input type="password" id="inputPasswordUserBaru" placeholder="Password min. 6 karakter..." style="flex: 2; min-width: 160px;">
+            <select id="selectRoleUserBaru" style="flex: 1; min-width: 110px;">
                 <option value="member">Member</option>
                 <option value="operator">Operator</option>
                 <option value="admin">Admin</option>
             </select>
-            <button type="button" class="save-btn" onclick="tambahPenggunaBaru()" style="width: auto; padding: 11px 18px; font-size: 13px;">+ Tambah/Set Role</button>
+            <button type="button" class="save-btn" onclick="tambahPenggunaBaru()" style="width: auto; padding: 11px 18px; font-size: 13px;">+ Buat Akun Baru</button>
         </div>
 
         <!-- CONTAINER CARD LIST USER MANAGEMENT -->
@@ -423,7 +423,6 @@
             <div style="text-align:center;color:#888;padding:20px;">Memuat daftar pengguna...</div>
         </div>
     </div>
-
 
     <!-- SEKSI AUDIT LOGS (DIPISAH ROLE & FILTER KALENDER) -->
     <div class="section" id="sectionAuditLog">
