@@ -401,6 +401,35 @@
         </div>
     </div>
 
+    <!-- SEKSI ADMIN PANEL: MANAJEMEN PENGGUNA & HAK AKSES -->
+    <div class="section" id="sectionAdminPanel" style="display: none;">
+        <h2>👥 Manajemen Pengguna & Hak Akses (Admin Panel)</h2>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Kelola akun pengurus, ubah role (Admin, Operator, Member), atau hapus akses pengguna</p>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center;">
+            <input type="email" id="inputEmailUserBaru" placeholder="Email pengguna baru..." style="flex: 2; min-width: 180px;">
+            <select id="selectRoleUserBaru" style="flex: 1; min-width: 120px;">
+                <option value="member">Member</option>
+                <option value="operator">Operator</option>
+                <option value="admin">Admin</option>
+            </select>
+            <button type="button" class="save-btn" onclick="tambahPenggunaBaru()" style="width: auto; padding: 12px 20px;">+ Tambah/Set Role</button>
+        </div>
+
+        <div class="table-wrap">
+            <table style="min-width: 600px;">
+                <thead>
+                    <tr>
+                        <th>Email Pengguna</th>
+                        <th>Role / Hak Akses</th>
+                        <th style="text-align: center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyTabelUsers"></tbody>
+            </table>
+        </div>
+    </div>
+
     <!-- SEKSI AUDIT LOGS (DIPISAH ROLE & FILTER KALENDER) -->
     <div class="section" id="sectionAuditLog">
         <h2>📜 Riwayat Aktivitas Sistem (Audit Log)</h2>
