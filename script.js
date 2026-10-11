@@ -192,41 +192,46 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
-/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (AUTO FETCH & AUTO REGISTER MEMBER) */
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (OTOMATIS MENGAMBIL DARI PROFILES & AUDIT LOGS) */
 async function loadUsersList() {
     const tbody = document.getElementById('bodyTabelUsers');
     if (!tbody) return;
 
     try {
-        // 1. Ambil seluruh data riwayat login untuk mendeteksi semua email yang pernah masuk
-        const { data: logs } = await supabaseClient.from('log_login').select('email');
-        
-        // 2. Ambil data profiles yang sudah ada
-        const { data: profiles, error } = await supabaseClient
+        // 1. Ambil data profil yang sudah terdaftar
+        const { data: profiles, error: errProfiles } = await supabaseClient
             .from('profiles')
             .select('*');
 
-        if (error) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat data profiles.</td></tr>`;
+        if (errProfiles) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat data pengguna.</td></tr>`;
             return;
         }
 
-        // Kumpulkan seluruh email unik dari log login & profiles
+        // 2. Ambil seluruh email dari audit logs agar pengguna yang baru login/aktivitas otomatis terdeteksi
+        const { data: auditLogs } = await supabaseClient
+            .from('audit_logs')
+            .select('user_email, user_role');
+
         let userMap = new Map();
 
-        // Masukkan data profiles yang ada
+        // Masukkan pengguna yang ada di profiles
         (profiles || []).forEach(p => {
-            if (p.email) userMap.set(p.email.toLowerCase(), p.role || 'member');
+            if (p.email) {
+                userMap.set(p.email.toLowerCase(), p.role || 'member');
+            }
         });
 
-        // Jika ada email dari log login yang belum ada di profiles, otomatis beri role 'member'
-        (logs || []).forEach(l => {
-            if (l.email) {
-                const em = l.email.toLowerCase();
-                if (!userMap.has(em)) {
-                    userMap.set(em, 'member');
-                    // Otomatis daftarkan ke profiles sebagai member
-                    supabaseClient.from('profiles').insert([{ email: em, role: 'member' }]);
+        // Masukkan pengguna dari audit_logs jika belum tercatat di profiles
+        (auditLogs || []).forEach(log => {
+            if (log.user_email && log.user_email !== 'System' && !log.user_email.includes('null')) {
+                const emailClean = log.user_email.toLowerCase();
+                if (!userMap.has(emailClean)) {
+                    const defaultRole = (log.user_role || 'member').toLowerCase();
+                    userMap.set(emailClean, defaultRole);
+
+                    // Daftarkan otomatis ke profiles agar tersimpan permanen
+                    supabaseClient.from('profiles').insert([{ email: emailClean, role: defaultRole }]);
                 }
             }
         });
@@ -260,6 +265,7 @@ async function loadUsersList() {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</td></tr>`;
     }
 }
+
 
 
 async function tambahPenggunaBaru() {
