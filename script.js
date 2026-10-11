@@ -1082,14 +1082,14 @@ function stopHeartbeat() {
     }
 }
 
-/* REALTIME DETECTOR SESI & PERUBAHAN DATA SISWA */
+/* REALTIME DETECTOR SESI, PERUBAHAN SISWA, PROFILES, & AUDIT LOGS */
 function initRealtimeSessionListener(myEmail) {
     if (sessionChannel) {
         supabaseClient.removeChannel(sessionChannel);
     }
 
     sessionChannel = supabaseClient
-        .channel('session_lock_tracker')
+        .channel('app_realtime_tracker')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'session_lock' }, async (payload) => {
             const newLock = payload.new;
             if (newLock && newLock.user_email && newLock.user_email !== myEmail) {
@@ -1116,6 +1116,22 @@ function initRealtimeSessionListener(myEmail) {
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'siswa' }, async () => {
             await renderTabelSiswa();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async (payload) => {
+            // Jika role akun yang sedang login diubah oleh Admin
+            const updated = payload.new;
+            if (updated && updated.email && updated.email.toLowerCase() === myEmail.toLowerCase()) {
+                const newRole = (updated.role || 'member').toLowerCase();
+                if (newRole !== currentUserRole) {
+                    currentUserRole = newRole;
+                    terapkanHakAksesUI();
+                    showToast(`🔔 Hak akses (role) kamu diperbarui menjadi: ${currentUserRole.toUpperCase()}`);
+                }
+            }
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, async () => {
+            // Memperbarui tampilan audit log secara otomatis saat ada aktivitas baru
+            await loadAuditLogs();
         })
         .subscribe();
 }
