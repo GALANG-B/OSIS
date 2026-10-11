@@ -311,24 +311,30 @@ async function ubahRoleUser(email, newRole) {
     }
 
     try {
-        // Menggunakan upsert agar jika email belum ada di tabel profiles, otomatis dibuatkan barisnya
+        const emailClean = email.toLowerCase().trim();
+
+        // Menggunakan upsert langsung berdasarkan primary key email
         const { error } = await supabaseClient
             .from('profiles')
-            .upsert({ email: email, role: newRole }, { onConflict: 'email' });
+            .upsert([{ email: emailClean, role: newRole }], { onConflict: 'email' });
 
         if (error) {
+            console.error("Gagal update role:", error);
             showToast("❌ Gagal mengubah role pengguna");
             await loadUsersList();
             return;
         }
 
-        await logAuditAction('UBAH_ROLE_USER', `Mengubah role ${email} menjadi ${newRole}`);
-        showToast(`✅ Role ${email} diubah menjadi ${newRole}`);
+        await logAuditAction('UBAH_ROLE_USER', `Mengubah role ${emailClean} menjadi ${newRole}`);
+        showToast(`✅ Role ${emailClean} berhasil diubah menjadi ${newRole.toUpperCase()}`);
         await loadUsersList();
     } catch (e) {
-        showToast("❌ Terjadi kesalahan");
+        console.error("Error:", e);
+        showToast("❌ Terjadi kesalahan sistem");
+        await loadUsersList();
     }
 }
+
 
 async function hapusUser(email) {
     if (currentUserRole !== 'admin') {
