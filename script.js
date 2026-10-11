@@ -1555,5 +1555,51 @@ window.exportCSV = function () {
     logAuditAction('EKSPOR_CSV', 'Mengekspor laporan kas ke format CSV');
 };
 
+/* KALKULATOR PATUNGAN KILAT (SPLIT BILL) */
+let lastCalcData = { keterangan: '', total: 0, orang: 0, hasilPerOrang: 0 };
+
+window.hitungPatungan = function() {
+    const ketInput = document.getElementById('calcKeterangan');
+    const totalInput = document.getElementById('calcTotalBiaya');
+    const orangInput = document.getElementById('calcJumlahOrang');
+
+    const ket = ketInput ? ketInput.value.trim() : 'Keperluan Kelas';
+    const total = totalInput ? parseFloat(totalInput.value) : 0;
+    const orang = orangInput ? parseInt(orangInput.value) : 0;
+
+    if (!total || total <= 0 || !orang || orang <= 0) {
+        showToast("⚠️ Masukkan total biaya dan jumlah orang yang valid!");
+        return;
+    }
+
+    // Pembulatan ke atas kelipatan 500 terdekat
+    let perOrang = Math.ceil((total / orang) / 500) * 500;
+    
+    lastCalcData = { keterangan: ket || 'Keperluan Kelas', total: total, orang: orang, hasilPerOrang: perOrang };
+
+    const elHasil = document.getElementById('calcHasilNominal');
+    const elContainer = document.getElementById('calcResultContainer');
+
+    if (elHasil) elHasil.textContent = rupiah(perOrang);
+    if (elContainer) elContainer.style.display = 'block';
+
+    logAuditAction('HITUNG_PATUNGAN', `Menghitung patungan: ${lastCalcData.keterangan} (${rupiah(total)} / ${orang} orang)`);
+    showToast("✅ Perhitungan patungan berhasil!");
+};
+
+window.kirimHasilPatunganWA = function() {
+    if (!lastCalcData.total) return;
+    
+    let pesan = `Halo teman-teman,\n\n`;
+    pesan += `Berikut adalah rincian patungan untuk *${lastCalcData.keterangan}*:\n`;
+    pesan += `• *Total Biaya*: ${rupiah(lastCalcData.total)}\n`;
+    pesan += `• *Jumlah Anggota*: ${lastCalcData.orang} orang\n`;
+    pesan += `• *Beban Per Orang*: *${rupiah(lastCalcData.hasilPerOrang)}*\n\n`;
+    pesan += `Mohon segera dibayarkan kepada bendahara ya. Terima kasih! 🙏`;
+
+    const encodedPesan = encodeURIComponent(pesan);
+    window.open(`https://wa.me/?text=${encodedPesan}`, '_blank');
+};
+
 /* MENJALANKAN PENGECEKAN SESI AWAL */
 checkLogin();
