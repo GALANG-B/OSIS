@@ -310,46 +310,48 @@ async function ubahRoleUser(email, newRole) {
         return;
     }
 
-    try {
-        const emailClean = email.toLowerCase().trim();
+    const emailClean = email.toLowerCase().trim();
 
-        // 1. Coba UPDATE berdasarkan email
+    try {
+        // 1. Coba UPDATE terlebih dahulu
         const { data: updateData, error: updateErr } = await supabaseClient
             .from('profiles')
             .update({ role: newRole })
             .eq('email', emailClean)
             .select();
 
-        // 2. Jika baris belum ada di profiles, lakukan INSERT
+        if (updateErr) {
+            console.error("Supabase UPDATE Error:", updateErr);
+        }
+
+        // 2. Jika baris belum ada di profiles (data kosong), lakukan INSERT
         if (!updateErr && (!updateData || updateData.length === 0)) {
             const { error: insertErr } = await supabaseClient
                 .from('profiles')
                 .insert([{ email: emailClean, role: newRole }]);
 
             if (insertErr) {
-                console.error("Gagal INSERT profile baru:", insertErr);
-                showToast("❌ Gagal menambahkan role ke database");
+                console.error("Supabase INSERT Error:", insertErr);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Menyimpan Role',
+                    text: `Detail Error: ${insertErr.message || insertErr.details || 'Akses ditolak database'}`
+                });
                 await loadUsersList();
                 return;
             }
-        } else if (updateErr) {
-            console.error("Gagal UPDATE profile:", updateErr);
-            showToast("❌ Gagal memperbarui role");
-            await loadUsersList();
-            return;
         }
 
-        // Catat aktivitas ke audit log
         await logAuditAction('UBAH_ROLE_USER', `Mengubah role ${emailClean} menjadi ${newRole}`);
-        showToast(`✅ Role ${emailClean} berhasil diubah ke ${newRole.toUpperCase()}`);
+        showToast(`✅ Role ${emailClean} diubah menjadi ${newRole.toUpperCase()}`);
         await loadUsersList();
+
     } catch (e) {
-        console.error("Error:", e);
+        console.error("System Catch Error:", e);
         showToast("❌ Terjadi kesalahan sistem");
         await loadUsersList();
     }
 }
-
 
 async function hapusUser(email) {
     if (currentUserRole !== 'admin') {
