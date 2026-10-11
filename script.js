@@ -201,7 +201,7 @@ function tampilkanSapaanRole() {
     if (currentUserRole === 'admin') {
         Swal.fire({
             icon: 'success',
-            title: 'Halo, Operator Utama (Admin)! 👑',
+            title: 'Halo, Ketua Osis (Admin)! 👑',
             html: 'Selamat bekerja! Kamu punya <b>akses tertinggi</b> untuk mengelola kas dan mengambil alih sesi.',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
@@ -211,7 +211,7 @@ function tampilkanSapaanRole() {
     } else if (currentUserRole === 'operator') {
         Swal.fire({
             icon: 'success',
-            title: 'Halo, Operator B! 🛠️',
+            title: 'Halo, Bendahara! 🛠️',
             html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola kas. (Akan menunggu jika Operator A sedang aktif).',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
