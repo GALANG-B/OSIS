@@ -313,20 +313,35 @@ async function ubahRoleUser(email, newRole) {
     try {
         const emailClean = email.toLowerCase().trim();
 
-        // Menggunakan upsert langsung berdasarkan primary key email
-        const { error } = await supabaseClient
+        // 1. Coba UPDATE berdasarkan email
+        const { data: updateData, error: updateErr } = await supabaseClient
             .from('profiles')
-            .upsert([{ email: emailClean, role: newRole }], { onConflict: 'email' });
+            .update({ role: newRole })
+            .eq('email', emailClean)
+            .select();
 
-        if (error) {
-            console.error("Gagal update role:", error);
-            showToast("❌ Gagal mengubah role pengguna");
+        // 2. Jika baris belum ada di profiles, lakukan INSERT
+        if (!updateErr && (!updateData || updateData.length === 0)) {
+            const { error: insertErr } = await supabaseClient
+                .from('profiles')
+                .insert([{ email: emailClean, role: newRole }]);
+
+            if (insertErr) {
+                console.error("Gagal INSERT profile baru:", insertErr);
+                showToast("❌ Gagal menambahkan role ke database");
+                await loadUsersList();
+                return;
+            }
+        } else if (updateErr) {
+            console.error("Gagal UPDATE profile:", updateErr);
+            showToast("❌ Gagal memperbarui role");
             await loadUsersList();
             return;
         }
 
+        // Catat aktivitas ke audit log
         await logAuditAction('UBAH_ROLE_USER', `Mengubah role ${emailClean} menjadi ${newRole}`);
-        showToast(`✅ Role ${emailClean} berhasil diubah menjadi ${newRole.toUpperCase()}`);
+        showToast(`✅ Role ${emailClean} berhasil diubah ke ${newRole.toUpperCase()}`);
         await loadUsersList();
     } catch (e) {
         console.error("Error:", e);
