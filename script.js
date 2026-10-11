@@ -284,12 +284,10 @@ async function tambahPenggunaBaru() {
     }
 
     try {
-        // Buat instance client sekunder agar sesi Admin yang sedang login tidak terputus/terganti
         const tempSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
             auth: { persistSession: false }
         });
 
-        // Mendaftarkan akun ke Supabase Auth
         const { error: authErr } = await tempSupabase.auth.signUp({
             email: email,
             password: password
@@ -301,7 +299,6 @@ async function tambahPenggunaBaru() {
             return;
         }
 
-        // Simpan role pengguna ke tabel profiles
         const { error: profileErr } = await supabaseClient
             .from('profiles')
             .upsert([{ email: email, role: role }], { onConflict: 'email' });
@@ -473,25 +470,29 @@ function generateYearOptions() {
     }
 }
 
-/* CEK ROLE PENGGUNA DARI TABEL PROFILES */
+/* CEK ROLE PENGGUNA DARI TABEL PROFILES & BLOKIR JIKA TIDAK DITEMUKAN */
 async function checkUserRole(email) {
     try {
+        const emailClean = email.toLowerCase().trim();
         const { data, error } = await supabaseClient
             .from('profiles')
             .select('role')
-            .eq('email', email)
+            .eq('email', emailClean)
             .maybeSingle();
 
-        if (data && data.role) {
-            currentUserRole = data.role.toLowerCase();
-        } else {
-            currentUserRole = 'member';
+        if (error || !data) {
+            currentUserRole = 'BLOCKED';
+            return 'BLOCKED';
         }
-    } catch (e) {
-        currentUserRole = 'member';
-    }
 
-    terapkanHakAksesUI();
+        currentUserRole = (data.role || 'member').toLowerCase();
+        return currentUserRole;
+    } catch (e) {
+        currentUserRole = 'BLOCKED';
+        return 'BLOCKED';
+    } finally {
+        terapkanHakAksesUI();
+    }
 }
 
 /* MENERAPKAN HAK AKSES UI BERDASARKAN ROLE */
@@ -1160,7 +1161,7 @@ function initRealtimeSessionListener(myEmail) {
         .subscribe();
 }
 
-/* PROSES LOGIN DENGAN PRIORITAS ROLE HIERARKI */
+/* PROSES LOGIN DENGAN PRIORITAS ROLE HIERARKI & PROTEKSI AKUN TERHAPUS */
 window.login = async function () {
     if (isLockedOut()) return;
 
@@ -1193,7 +1194,15 @@ window.login = async function () {
             errorElement.style.display = "block";
         }
     } else {
-        await checkUserRole(data.user.email);
+        const roleStatus = await checkUserRole(data.user.email);
+
+        if (roleStatus === 'BLOCKED') {
+            await supabaseClient.auth.signOut();
+            await logAuditAction('LOGIN_DITOLAK', `Upaya login diblokir karena akun ${data.user.email} telah dihapus`);
+            errorElement.innerHTML = `🚫 <b>Akses Ditolak!</b><br>Akun Anda telah dinonaktifkan/dihapus oleh Admin.`;
+            errorElement.style.display = "block";
+            return;
+        }
 
         const lockStatus = await checkActiveSessionLock(data.user.email, currentUserRole);
         if (lockStatus.locked) {
@@ -1240,7 +1249,20 @@ async function checkLogin() {
 
     if (session) {
         const userEmail = session.user.email;
-        await checkUserRole(userEmail);
+        const roleStatus = await checkUserRole(userEmail);
+
+        if (roleStatus === 'BLOCKED') {
+            stopHeartbeat();
+            await supabaseClient.auth.signOut();
+            document.getElementById("loginPage").style.display = "flex";
+            document.getElementById("dashboard").style.display = "none";
+            const errorElement = document.getElementById("loginError");
+            if (errorElement) {
+                errorElement.innerHTML = `🚫 Akun Anda telah dinonaktifkan/dihapus oleh Admin.`;
+                errorElement.style.display = "block";
+            }
+            return;
+        }
 
         const lockStatus = await checkActiveSessionLock(userEmail, currentUserRole);
         if (lockStatus.locked) {
