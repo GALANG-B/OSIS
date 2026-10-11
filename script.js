@@ -311,10 +311,10 @@ async function ubahRoleUser(email, newRole) {
     }
 
     try {
+        // Menggunakan upsert agar jika email belum ada di tabel profiles, otomatis dibuatkan barisnya
         const { error } = await supabaseClient
             .from('profiles')
-            .update({ role: newRole })
-            .eq('email', email);
+            .upsert({ email: email, role: newRole }, { onConflict: 'email' });
 
         if (error) {
             showToast("❌ Gagal mengubah role pengguna");
