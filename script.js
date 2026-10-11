@@ -192,77 +192,89 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
-/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (OTOMATIS MENGAMBIL DARI PROFILES & AUDIT LOGS) */
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (DESAIN KARTU DESKTOP & MOBILE) */
 async function loadUsersList() {
-    const tbody = document.getElementById('bodyTabelUsers');
-    if (!tbody) return;
+    const container = document.getElementById('bodyTabelUsers');
+    if (!container) return;
 
     try {
-        // 1. Ambil data profil yang sudah terdaftar
+        // 1. Ambil data profil yang sudah ada
         const { data: profiles, error: errProfiles } = await supabaseClient
             .from('profiles')
             .select('*');
 
         if (errProfiles) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat data pengguna.</td></tr>`;
+            container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Gagal memuat data pengguna.</div>`;
             return;
         }
 
-        // 2. Ambil seluruh email dari audit logs agar pengguna yang baru login/aktivitas otomatis terdeteksi
+        // 2. Ambil seluruh email dari audit logs agar akun terdeteksi otomatis
         const { data: auditLogs } = await supabaseClient
             .from('audit_logs')
             .select('user_email, user_role');
 
         let userMap = new Map();
 
-        // Masukkan pengguna yang ada di profiles
         (profiles || []).forEach(p => {
             if (p.email) {
                 userMap.set(p.email.toLowerCase(), p.role || 'member');
             }
         });
 
-        // Masukkan pengguna dari audit_logs jika belum tercatat di profiles
         (auditLogs || []).forEach(log => {
             if (log.user_email && log.user_email !== 'System' && !log.user_email.includes('null')) {
                 const emailClean = log.user_email.toLowerCase();
                 if (!userMap.has(emailClean)) {
                     const defaultRole = (log.user_role || 'member').toLowerCase();
                     userMap.set(emailClean, defaultRole);
-
-                    // Daftarkan otomatis ke profiles agar tersimpan permanen
                     supabaseClient.from('profiles').insert([{ email: emailClean, role: defaultRole }]);
                 }
             }
         });
 
         if (userMap.size === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Belum ada pengguna terdaftar.</td></tr>`;
+            container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Belum ada pengguna terdaftar.</div>`;
             return;
         }
 
-        tbody.innerHTML = '';
+        container.innerHTML = '';
         userMap.forEach((role, email) => {
-            const tr = document.createElement('tr');
-            const roleClean = (role || 'member').toLowerCase();
+            let displayUser = escapeHTML(email);
+            if (displayUser.includes('@')) {
+                displayUser = displayUser.split('@')[0];
+            }
 
-            tr.innerHTML = `
-                <td style="word-break: break-all;"><b>${escapeHTML(email)}</b></td>
-                <td>
-                    <select onchange="ubahRoleUser('${escapeHTML(email)}', this.value)" style="padding: 6px 8px; font-size: 12px; min-width: 100px;">
-                        <option value="member" ${roleClean === 'member' ? 'selected' : ''}>Member</option>
-                        <option value="operator" ${roleClean === 'operator' ? 'selected' : ''}>Operator</option>
-                        <option value="admin" ${roleClean === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
-                <td style="text-align: center;">
-                    <button class="delete-btn" onclick="hapusUser('${escapeHTML(email)}')">Hapus</button>
-                </td>
+            const roleClean = (role || 'member').toLowerCase();
+            let roleBg = '#d97706';
+            if (roleClean === 'admin') roleBg = '#8b5cf6';
+            else if (roleClean === 'operator') roleBg = '#059669';
+
+            const card = document.createElement('div');
+            card.className = 'user-card-item';
+            card.innerHTML = `
+                <div class="user-card-header">
+                    <div class="user-card-title">
+                        👤 <b>${displayUser}</b>
+                        <span style="font-size: 11px; color: var(--text-secondary); font-weight: normal; margin-left: 4px;">(${escapeHTML(email)})</span>
+                    </div>
+                    <span class="user-role-badge" style="background: ${roleBg};">${roleClean.toUpperCase()}</span>
+                </div>
+                <div class="user-card-body">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+                        <span style="font-size: 12px; color: var(--text-secondary); font-weight: 600;">Ubah Hak Akses:</span>
+                        <select onchange="ubahRoleUser('${escapeHTML(email)}', this.value)" class="user-role-select">
+                            <option value="member" ${roleClean === 'member' ? 'selected' : ''}>Member</option>
+                            <option value="operator" ${roleClean === 'operator' ? 'selected' : ''}>Operator</option>
+                            <option value="admin" ${roleClean === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </div>
+                    <button class="delete-btn" onclick="hapusUser('${escapeHTML(email)}')" style="padding: 6px 12px; font-size: 12px;">Hapus Akun</button>
+                </div>
             `;
-            tbody.appendChild(tr);
+            container.appendChild(card);
         });
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</td></tr>`;
+        container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</div>`;
     }
 }
 
