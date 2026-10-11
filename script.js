@@ -212,7 +212,7 @@ function tampilkanSapaanRole() {
         Swal.fire({
             icon: 'success',
             title: 'Halo, Bendahara! 🛠️',
-            html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola kas. (Akan menunggu jika Operator A sedang aktif).',
+            html: 'Selamat bekerja! Kamu punya <b>akses penuh</b> untuk mengelola kas. (Akan menunggu jika Ketua Osis sedang aktif).',
             confirmButtonColor: '#10b981',
             confirmButtonText: 'Mulai Kelola Kas',
             background: bgSwal,
