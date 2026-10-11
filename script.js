@@ -192,46 +192,75 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
-/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA */
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (AUTO FETCH & AUTO REGISTER MEMBER) */
 async function loadUsersList() {
     const tbody = document.getElementById('bodyTabelUsers');
     if (!tbody) return;
 
     try {
+        // 1. Ambil seluruh data riwayat login untuk mendeteksi semua email yang pernah masuk
+        const { data: logs } = await supabaseClient.from('log_login').select('email');
+        
+        // 2. Ambil data profiles yang sudah ada
         const { data: profiles, error } = await supabaseClient
             .from('profiles')
-            .select('*')
-            .order('email', { ascending: true });
+            .select('*');
 
-        if (error || !profiles || profiles.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Belum ada data pengguna.</td></tr>`;
+        if (error) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat data profiles.</td></tr>`;
+            return;
+        }
+
+        // Kumpulkan seluruh email unik dari log login & profiles
+        let userMap = new Map();
+
+        // Masukkan data profiles yang ada
+        (profiles || []).forEach(p => {
+            if (p.email) userMap.set(p.email.toLowerCase(), p.role || 'member');
+        });
+
+        // Jika ada email dari log login yang belum ada di profiles, otomatis beri role 'member'
+        (logs || []).forEach(l => {
+            if (l.email) {
+                const em = l.email.toLowerCase();
+                if (!userMap.has(em)) {
+                    userMap.set(em, 'member');
+                    // Otomatis daftarkan ke profiles sebagai member
+                    supabaseClient.from('profiles').insert([{ email: em, role: 'member' }]);
+                }
+            }
+        });
+
+        if (userMap.size === 0) {
+            tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Belum ada pengguna terdaftar.</td></tr>`;
             return;
         }
 
         tbody.innerHTML = '';
-        profiles.forEach(user => {
+        userMap.forEach((role, email) => {
             const tr = document.createElement('tr');
-            const role = (user.role || 'member').toLowerCase();
+            const roleClean = (role || 'member').toLowerCase();
 
             tr.innerHTML = `
-                <td><b>${escapeHTML(user.email)}</b></td>
+                <td style="word-break: break-all;"><b>${escapeHTML(email)}</b></td>
                 <td>
-                    <select onchange="ubahRoleUser('${escapeHTML(user.email)}', this.value)" style="padding: 6px 10px; font-size: 12px; width: 130px;">
-                        <option value="member" ${role === 'member' ? 'selected' : ''}>Member</option>
-                        <option value="operator" ${role === 'operator' ? 'selected' : ''}>Operator</option>
-                        <option value="admin" ${role === 'admin' ? 'selected' : ''}>Admin</option>
+                    <select onchange="ubahRoleUser('${escapeHTML(email)}', this.value)" style="padding: 6px 8px; font-size: 12px; min-width: 100px;">
+                        <option value="member" ${roleClean === 'member' ? 'selected' : ''}>Member</option>
+                        <option value="operator" ${roleClean === 'operator' ? 'selected' : ''}>Operator</option>
+                        <option value="admin" ${roleClean === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                 </td>
                 <td style="text-align: center;">
-                    <button class="delete-btn" onclick="hapusUser('${escapeHTML(user.email)}')">Hapus</button>
+                    <button class="delete-btn" onclick="hapusUser('${escapeHTML(email)}')">Hapus</button>
                 </td>
             `;
             tbody.appendChild(tr);
         });
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Gagal memuat daftar pengguna.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</td></tr>`;
     }
 }
+
 
 async function tambahPenggunaBaru() {
     if (currentUserRole !== 'admin') {
