@@ -41,8 +41,8 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 /* HIERARKI PRIORITAS LOGIN (SESSION LOCK) */
 const ROLE_PRIORITY = {
-    'admin': 3,     // Operator A
-    'operator': 2,  // Operator B
+    'admin': 3,     // Ketua Osis / Admin
+    'operator': 2,  // Bendahara / Operator
     'member': 1     // Member
 };
 
@@ -67,7 +67,7 @@ const Toast = Swal.mixin({
 
 function showToast(message) {
     let iconType = 'info';
-    if (message.includes('✅') || message.includes('🎉')) iconType = 'success';
+    if (message.includes('✅') || message.includes('🎉') || message.toLowerCase().includes('berhasil')) iconType = 'success';
     else if (message.includes('❌') || message.includes('🗑') || message.includes('🚫')) iconType = 'error';
     else if (message.includes('⚠️') || message.includes('⏳')) iconType = 'warning';
 
@@ -192,13 +192,12 @@ function resetFilterAudit() {
     renderAuditLogs(allAuditLogs);
 }
 
-/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (HANYA MENGAMBIL DARI TABEL PROFILES) */
+/* FUNGSI ADMIN PANEL: MANAJEMEN PENGGUNA (CARD LIST) */
 async function loadUsersList() {
     const container = document.getElementById('bodyTabelUsers');
     if (!container) return;
 
     try {
-        // Ambil murni hanya dari tabel profiles
         const { data: profiles, error: errProfiles } = await supabaseClient
             .from('profiles')
             .select('*')
@@ -226,9 +225,9 @@ async function loadUsersList() {
             }
 
             const roleClean = (p.role || 'member').toLowerCase();
-            let roleBg = '#d97706'; // Member (Kuning/Cokelat)
-            if (roleClean === 'admin') roleBg = '#8b5cf6'; // Admin (Ungu)
-            else if (roleClean === 'operator') roleBg = '#059669'; // Operator (Hijau)
+            let roleBg = '#d97706'; 
+            if (roleClean === 'admin') roleBg = '#8b5cf6'; 
+            else if (roleClean === 'operator') roleBg = '#059669'; 
 
             const card = document.createElement('div');
             card.className = 'user-card-item';
@@ -259,9 +258,6 @@ async function loadUsersList() {
         container.innerHTML = `<div style="text-align:center;color:#888;padding:15px;">Terjadi kesalahan memuat data pengguna.</div>`;
     }
 }
-
-
-
 
 async function tambahPenggunaBaru() {
     if (currentUserRole !== 'admin') {
@@ -308,7 +304,6 @@ async function ubahRoleUser(email, newRole) {
     const emailClean = email.toLowerCase().trim();
 
     try {
-        // 1. Coba UPDATE terlebih dahulu
         const { data: updateData, error: updateErr } = await supabaseClient
             .from('profiles')
             .update({ role: newRole })
@@ -319,7 +314,6 @@ async function ubahRoleUser(email, newRole) {
             console.error("Supabase UPDATE Error:", updateErr);
         }
 
-        // 2. Jika baris belum ada di profiles (data kosong), lakukan INSERT
         if (!updateErr && (!updateData || updateData.length === 0)) {
             const { error: insertErr } = await supabaseClient
                 .from('profiles')
@@ -354,11 +348,12 @@ async function hapusUser(email) {
         return;
     }
 
+    const emailClean = email.toLowerCase().trim();
     const isDark = document.documentElement.getAttribute("data-theme") !== "light";
 
     Swal.fire({
         title: 'Hapus Pengguna?',
-        text: `Yakin ingin menghapus akses untuk ${email}?`,
+        text: `Yakin ingin menghapus akses untuk ${emailClean}?`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#ef4444',
@@ -373,18 +368,20 @@ async function hapusUser(email) {
                 const { error } = await supabaseClient
                     .from('profiles')
                     .delete()
-                    .eq('email', email);
+                    .eq('email', emailClean);
 
                 if (error) {
-                    showToast("❌ Gagal menghapus pengguna");
+                    console.error("Gagal delete profile:", error);
+                    showToast("❌ Gagal menghapus pengguna dari database");
                     return;
                 }
 
-                await logAuditAction('HAPUS_PENGGUNA', `Menghapus akses pengguna ${email}`);
-                showToast("🗑 Pengguna berhasil dihapus");
+                await logAuditAction('HAPUS_PENGGUNA', `Menghapus akses pengguna ${emailClean}`);
+                showToast("✅ Pengguna berhasil dihapus");
                 await loadUsersList();
             } catch (e) {
-                showToast("❌ Terjadi kesalahan");
+                console.error("Catch error hapusUser:", e);
+                showToast("❌ Terjadi kesalahan sistem");
             }
         }
     });
@@ -1113,7 +1110,6 @@ function initRealtimeSessionListener(myEmail) {
             await renderTabelSiswa();
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, async (payload) => {
-            // Jika role akun yang sedang login diubah oleh Admin
             const updated = payload.new;
             if (updated && updated.email && updated.email.toLowerCase() === myEmail.toLowerCase()) {
                 const newRole = (updated.role || 'member').toLowerCase();
@@ -1123,9 +1119,12 @@ function initRealtimeSessionListener(myEmail) {
                     showToast(`🔔 Hak akses (role) kamu diperbarui menjadi: ${currentUserRole.toUpperCase()}`);
                 }
             }
+            // Jika admin, perbarui list user secara realtime
+            if (currentUserRole === 'admin') {
+                await loadUsersList();
+            }
         })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, async () => {
-            // Memperbarui tampilan audit log secara otomatis saat ada aktivitas baru
             await loadAuditLogs();
         })
         .subscribe();
