@@ -460,6 +460,37 @@
     </div>
 </div>
 
+    <!-- KALKULATOR PATUNGAN KILAT (SPLIT BILL) -->
+<div class="section">
+    <h2>🧮 Kalkulator Patungan Kilat</h2>
+    <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px;">Hitung dan bagi beban biaya mendadak secara adil ke seluruh anggota</p>
+    
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div>
+            <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">Keperluan / Keterangan:</label>
+            <input type="text" id="calcKeterangan" placeholder="Contoh: Kado Ulang Tahun Wali Kelas">
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">Total Biaya (Rp):</label>
+                <input type="number" id="calcTotalBiaya" placeholder="Contoh: 50000">
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px;">Jumlah Orang:</label>
+                <input type="number" id="calcJumlahOrang" placeholder="Contoh: 30">
+            </div>
+        </div>
+        <button type="button" class="save-btn" onclick="hitungPatungan()">Hitung Beban Per Orang</button>
+        
+        <div id="calcResultContainer" style="display: none; background: rgba(16, 185, 129, 0.1); border: 1px dashed #10b981; padding: 16px; border-radius: 12px; text-align: center; margin-top: 5px;">
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">Nominal per orang (sudah dibulatkan praktis):</p>
+            <h2 id="calcHasilNominal" style="color: #34d399; margin-bottom: 12px; font-size: 24px;">Rp 0</h2>
+            <button type="button" class="refresh-btn" style="background: #2563eb; color: white; border: none; padding: 10px 18px;" onclick="kirimHasilPatunganWA()">💬 Bagikan Tagihan ke WhatsApp</button>
+        </div>
+    </div>
+</div>
+
+
 <footer>
     Sistem Kas Sekolah © 2026 💰💸 All Rights Reserved.
 </footer>
